@@ -1,16 +1,37 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState } from "react";
+import BottomNav from "@/components/BottomNav";
+import HomePage from "@/pages/HomePage";
+import CookPage from "@/pages/CookPage";
+import NearbyPage from "@/pages/NearbyPage";
+import FavoritesPage from "@/pages/FavoritesPage";
+import ProfilePage from "@/pages/ProfilePage";
 
-// IMPORTANT: Fully REPLACE this with your own code
-const PlaceholderIndex = () => {
-  // PLACEHOLDER: Replace this entire return statement with the user's app.
-  // The inline background color is intentionally not part of the design system.
+type Tab = "home" | "cook" | "nearby" | "favorites" | "profile";
+
+const Index = () => {
+  const [activeTab, setActiveTab] = useState<Tab>("home");
+
+  const handleNavigate = (tab: string) => {
+    const validTabs: Tab[] = ["home", "cook", "nearby", "favorites", "profile"];
+    if (tab === "planner") {
+      setActiveTab("favorites");
+      return;
+    }
+    if (validTabs.includes(tab as Tab)) {
+      setActiveTab(tab as Tab);
+    }
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: '#fcfbf8' }}>
-      <img data-lovable-blank-page-placeholder="REMOVE_THIS" src="/placeholder.svg" alt="Your app will live here!" />
+    <div className="min-h-screen bg-background max-w-lg mx-auto relative">
+      {activeTab === "home" && <HomePage onNavigate={handleNavigate} />}
+      {activeTab === "cook" && <CookPage />}
+      {activeTab === "nearby" && <NearbyPage />}
+      {activeTab === "favorites" && <FavoritesPage />}
+      {activeTab === "profile" && <ProfilePage />}
+      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
     </div>
   );
 };
-
-const Index = PlaceholderIndex;
 
 export default Index;
