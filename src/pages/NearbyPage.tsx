@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { MapPin, SlidersHorizontal } from "lucide-react";
+import { MapPin, SlidersHorizontal, Search } from "lucide-react";
 import RestaurantCard from "@/components/RestaurantCard";
 
 import salad from "@/assets/recipe-salad.jpg";
@@ -20,10 +20,20 @@ const allRestaurants = [
 
 const NearbyPage = () => {
   const [activeFilter, setActiveFilter] = useState("All");
+  const [search, setSearch] = useState("");
 
-  const filtered = activeFilter === "All"
-    ? allRestaurants
-    : allRestaurants.filter((r) => r.badges.some((b) => b.toLowerCase() === activeFilter.toLowerCase()));
+  const filtered = useMemo(() => {
+    let results = activeFilter === "All"
+      ? allRestaurants
+      : allRestaurants.filter((r) => r.badges.some((b) => b.toLowerCase() === activeFilter.toLowerCase()));
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      results = results.filter((r) =>
+        r.name.toLowerCase().includes(q) || r.badges.some((b) => b.toLowerCase().includes(q))
+      );
+    }
+    return results;
+  }, [activeFilter, search]);
 
   return (
     <div className="pb-20 min-h-screen">
@@ -37,7 +47,18 @@ const NearbyPage = () => {
         <p className="text-sm text-muted-foreground font-body mt-1">Discover delicious spots around you</p>
       </div>
 
-      <div className="px-5 mt-5">
+      <div className="px-5 mt-4">
+        {/* Search Bar */}
+        <div className="relative mb-4">
+          <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search food or restaurants..."
+            className="w-full bg-card rounded-2xl pl-11 pr-4 py-3 text-sm font-body text-foreground placeholder:text-muted-foreground shadow-soft focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+        </div>
+
         {/* Filters */}
         <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
           <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -72,7 +93,7 @@ const NearbyPage = () => {
           ))}
           {filtered.length === 0 && (
             <p className="text-center text-muted-foreground font-body py-12 text-sm">
-              We're still whisking up ideas for that 🥄
+              No results found for "{search || activeFilter}" 🥄
             </p>
           )}
         </div>
