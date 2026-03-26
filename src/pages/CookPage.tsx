@@ -60,6 +60,7 @@ const allRecipes: Recipe[] = [
 
 const CookPage = () => {
   const [selected, setSelected] = useState<string[]>([]);
+  const [ingredientInput, setIngredientInput] = useState("");
   const [showResult, setShowResult] = useState(false);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -70,6 +71,15 @@ const CookPage = () => {
       prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]
     );
     setShowResult(false);
+  };
+
+  const addCustomIngredient = () => {
+    const trimmed = ingredientInput.trim();
+    if (trimmed && !selected.includes(trimmed)) {
+      setSelected((prev) => [...prev, trimmed]);
+      setShowResult(false);
+    }
+    setIngredientInput("");
   };
 
   const generate = () => {
