@@ -60,6 +60,7 @@ const allRecipes: Recipe[] = [
 
 const CookPage = () => {
   const [selected, setSelected] = useState<string[]>([]);
+  const [ingredientInput, setIngredientInput] = useState("");
   const [showResult, setShowResult] = useState(false);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -70,6 +71,15 @@ const CookPage = () => {
       prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]
     );
     setShowResult(false);
+  };
+
+  const addCustomIngredient = () => {
+    const trimmed = ingredientInput.trim();
+    if (trimmed && !selected.includes(trimmed)) {
+      setSelected((prev) => [...prev, trimmed]);
+      setShowResult(false);
+    }
+    setIngredientInput("");
   };
 
   const generate = () => {
@@ -97,7 +107,26 @@ const CookPage = () => {
       <div className="px-5 pt-12">
         {/* Smart Cooking Assistant */}
         <h1 className="text-2xl font-display font-semibold text-foreground">Smart Cooking Assistant</h1>
-        <p className="text-sm text-muted-foreground font-body mt-1">Pick your ingredients, we'll do the rest ✨</p>
+        <p className="text-sm text-muted-foreground font-body mt-1">Type or pick your ingredients, we'll do the rest ✨</p>
+
+        {/* Ingredient Input */}
+        <div className="relative mt-4">
+          <input
+            type="text"
+            value={ingredientInput}
+            onChange={(e) => setIngredientInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && addCustomIngredient()}
+            placeholder="Type an ingredient and press Enter..."
+            className="w-full h-12 pl-4 pr-20 bg-card rounded-2xl shadow-soft text-sm font-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:shadow-card transition-all"
+          />
+          <button
+            onClick={addCustomIngredient}
+            disabled={!ingredientInput.trim()}
+            className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 bg-primary text-primary-foreground rounded-xl text-xs font-bold font-body disabled:opacity-40 transition-all"
+          >
+            Add
+          </button>
+        </div>
 
         {/* Selected Chips */}
         <div className="flex flex-wrap gap-2 mt-5 min-h-[32px]">
