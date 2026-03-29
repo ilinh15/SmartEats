@@ -147,6 +147,26 @@ const CookPage = () => {
           </AnimatePresence>
         </div>
 
+        {/* Cuisine Filter */}
+        <div className="mt-4">
+          <p className="text-xs font-body text-muted-foreground mb-2 uppercase tracking-wider font-bold">Cuisine Type</p>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {["All", "Chinese", "Malay", "Western", "Japanese", "Indian", "Korean"].map((cuisine) => (
+              <button
+                key={cuisine}
+                onClick={() => setSelectedCuisine(cuisine)}
+                className={`px-4 py-1.5 rounded-full text-xs font-medium font-body whitespace-nowrap transition-all ${
+                  selectedCuisine === cuisine
+                    ? "bg-primary text-primary-foreground shadow-elevated"
+                    : "bg-card text-foreground shadow-soft hover:shadow-card"
+                }`}
+              >
+                {cuisine}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* All Ingredients */}
         <div className="mt-4">
           <p className="text-xs font-body text-muted-foreground mb-2 uppercase tracking-wider font-bold">Popular Ingredients</p>
