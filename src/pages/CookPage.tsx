@@ -65,6 +65,7 @@ const CookPage = () => {
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [expandedRecipe, setExpandedRecipe] = useState<number | null>(null);
+  const [selectedCuisine, setSelectedCuisine] = useState("All");
 
   const toggle = (item: string) => {
     setSelected((prev) =>
