@@ -1,62 +1,27 @@
-import { useState, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { ChefHat, X, Clock, Users, Search, Star, ChevronRight } from "lucide-react";
+import { useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { ChefHat, ChevronRight, Clock, Search, Star, Users, X } from "lucide-react";
 import avocadoToast from "@/assets/recipe-avocado-toast.jpg";
-import pestoPasta from "@/assets/recipe-pesto-pasta.jpg";
-import smoothieBowl from "@/assets/recipe-smoothie-bowl.jpg";
-import salad from "@/assets/recipe-salad.jpg";
-import chocolateCake from "@/assets/recipe-chocolate-cake.jpg";
+import { recipes as allRecipes } from "@/data/recipes";
 
 const suggestedIngredients = [
-  "Chicken", "Pasta", "Tomato", "Garlic", "Onion", "Rice", "Eggs",
-  "Cheese", "Avocado", "Spinach", "Mushroom", "Lemon", "Basil", "Salmon",
+  "Chicken",
+  "Pasta",
+  "Tomato",
+  "Garlic",
+  "Onion",
+  "Rice",
+  "Eggs",
+  "Cheese",
+  "Avocado",
+  "Spinach",
+  "Mushroom",
+  "Lemon",
+  "Basil",
+  "Salmon",
 ];
 
-interface Recipe {
-  id: number;
-  image: string;
-  title: string;
-  time: string;
-  servings: string;
-  tag: string;
-  rating: number;
-  difficulty: string;
-  ingredients: string[];
-  instructions: string[];
-}
-
-const allRecipes: Recipe[] = [
-  {
-    id: 1, image: pestoPasta, title: "Summer Pesto Pasta", time: "15 Min", servings: "2",
-    tag: "Vegetarian 🌱", rating: 4.8, difficulty: "Easy",
-    ingredients: ["Pasta", "Basil", "Garlic", "Parmesan", "Pine nuts", "Olive oil"],
-    instructions: ["Cook pasta al dente", "Blend basil, garlic, pine nuts & oil", "Toss pasta with pesto", "Top with parmesan & serve"],
-  },
-  {
-    id: 2, image: smoothieBowl, title: "Acai Smoothie Bowl", time: "10 Min", servings: "1",
-    tag: "Healthy 🥗", rating: 4.9, difficulty: "Easy",
-    ingredients: ["Acai powder", "Banana", "Blueberries", "Granola", "Honey"],
-    instructions: ["Blend acai, banana & berries", "Pour into a bowl", "Top with granola & fruit", "Drizzle honey on top"],
-  },
-  {
-    id: 3, image: avocadoToast, title: "Avocado Toast Deluxe", time: "8 Min", servings: "1",
-    tag: "Quick ⚡", rating: 4.7, difficulty: "Easy",
-    ingredients: ["Avocado", "Sourdough bread", "Eggs", "Chili flakes", "Lemon", "Salt"],
-    instructions: ["Toast the sourdough bread", "Mash avocado with lemon & salt", "Spread on toast", "Top with poached egg & chili flakes"],
-  },
-  {
-    id: 4, image: salad, title: "Greek Chicken Salad", time: "20 Min", servings: "2",
-    tag: "High Protein 💪", rating: 4.6, difficulty: "Medium",
-    ingredients: ["Chicken breast", "Cucumber", "Tomato", "Feta", "Olives", "Olive oil"],
-    instructions: ["Grill chicken until cooked through", "Chop veggies & combine in bowl", "Slice chicken & add on top", "Dress with olive oil & lemon"],
-  },
-  {
-    id: 5, image: chocolateCake, title: "Chocolate Lava Cake", time: "30 Min", servings: "4",
-    tag: "Dessert 🍫", rating: 4.9, difficulty: "Medium",
-    ingredients: ["Dark chocolate", "Butter", "Eggs", "Sugar", "Flour", "Vanilla"],
-    instructions: ["Melt chocolate & butter together", "Whisk eggs & sugar until fluffy", "Fold in chocolate mixture & flour", "Bake at 200°C for 12 min"],
-  },
-];
+const cuisines = ["All", "Chinese", "Malay", "Western", "Japanese", "Indian", "Korean"];
 
 const CookPage = () => {
   const [selected, setSelected] = useState<string[]>([]);
@@ -64,12 +29,12 @@ const CookPage = () => {
   const [showResult, setShowResult] = useState(false);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
-  const [expandedRecipe, setExpandedRecipe] = useState<number | null>(null);
+  const [expandedRecipe, setExpandedRecipe] = useState<string | null>(null);
   const [selectedCuisine, setSelectedCuisine] = useState("All");
 
   const toggle = (item: string) => {
     setSelected((prev) =>
-      prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]
+      prev.includes(item) ? prev.filter((ingredient) => ingredient !== item) : [...prev, item],
     );
     setShowResult(false);
   };
@@ -93,30 +58,40 @@ const CookPage = () => {
   };
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return allRecipes;
-    const q = search.toLowerCase();
-    return allRecipes.filter(
-      (r) =>
-        r.title.toLowerCase().includes(q) ||
-        r.tag.toLowerCase().includes(q) ||
-        r.ingredients.some((i) => i.toLowerCase().includes(q))
+    let results = allRecipes;
+
+    if (selectedCuisine !== "All") {
+      results = results.filter((recipe) => recipe.cuisine === selectedCuisine);
+    }
+
+    if (!search.trim()) {
+      return results;
+    }
+
+    const query = search.toLowerCase();
+    return results.filter(
+      (recipe) =>
+        recipe.title.toLowerCase().includes(query) ||
+        recipe.tag.toLowerCase().includes(query) ||
+        recipe.description.toLowerCase().includes(query) ||
+        recipe.ingredients.some((ingredient) => ingredient.toLowerCase().includes(query)),
     );
-  }, [search]);
+  }, [search, selectedCuisine]);
 
   return (
     <div className="pb-20 min-h-screen" style={{ background: "var(--hero-gradient)" }}>
       <div className="px-5 pt-12">
-        {/* Smart Cooking Assistant */}
         <h1 className="text-2xl font-display font-semibold text-foreground">Smart Cooking Assistant</h1>
-        <p className="text-sm text-muted-foreground font-body mt-1">Type or pick your ingredients, we'll do the rest ✨</p>
+        <p className="text-sm text-muted-foreground font-body mt-1">
+          Type or pick your ingredients, we'll do the rest
+        </p>
 
-        {/* Ingredient Input */}
         <div className="relative mt-4">
           <input
             type="text"
             value={ingredientInput}
-            onChange={(e) => setIngredientInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && addCustomIngredient()}
+            onChange={(event) => setIngredientInput(event.target.value)}
+            onKeyDown={(event) => event.key === "Enter" && addCustomIngredient()}
             placeholder="Type an ingredient and press Enter..."
             className="w-full h-12 pl-4 pr-20 bg-card rounded-2xl shadow-soft text-sm font-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:shadow-card transition-all"
           />
@@ -129,7 +104,6 @@ const CookPage = () => {
           </button>
         </div>
 
-        {/* Selected Chips */}
         <div className="flex flex-wrap gap-2 mt-5 min-h-[32px]">
           <AnimatePresence>
             {selected.map((item) => (
@@ -148,11 +122,12 @@ const CookPage = () => {
           </AnimatePresence>
         </div>
 
-        {/* Cuisine Filter */}
         <div className="mt-4">
-          <p className="text-xs font-body text-muted-foreground mb-2 uppercase tracking-wider font-bold">Cuisine Type</p>
+          <p className="text-xs font-body text-muted-foreground mb-2 uppercase tracking-wider font-bold">
+            Cuisine Type
+          </p>
           <div className="flex gap-2 overflow-x-auto pb-1">
-            {["All", "Chinese", "Malay", "Western", "Japanese", "Indian", "Korean"].map((cuisine) => (
+            {cuisines.map((cuisine) => (
               <button
                 key={cuisine}
                 onClick={() => setSelectedCuisine(cuisine)}
@@ -168,9 +143,10 @@ const CookPage = () => {
           </div>
         </div>
 
-        {/* All Ingredients */}
         <div className="mt-4">
-          <p className="text-xs font-body text-muted-foreground mb-2 uppercase tracking-wider font-bold">Popular Ingredients</p>
+          <p className="text-xs font-body text-muted-foreground mb-2 uppercase tracking-wider font-bold">
+            Popular Ingredients
+          </p>
           <div className="flex flex-wrap gap-2">
             {suggestedIngredients.map((item) => (
               <button
@@ -188,7 +164,6 @@ const CookPage = () => {
           </div>
         </div>
 
-        {/* Generate Button */}
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
@@ -210,7 +185,6 @@ const CookPage = () => {
           )}
         </motion.button>
 
-        {/* Generated Result */}
         <AnimatePresence>
           {showResult && (
             <motion.div
@@ -224,12 +198,18 @@ const CookPage = () => {
               </div>
               <div className="p-5">
                 <h3 className="text-xl font-display font-semibold text-foreground">
-                  Creamy {selected[0]} & {selected[1] || "Herb"} Delight
+                  Creamy {selected[0]} and {selected[1] || "Herb"} Delight
                 </h3>
                 <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground font-body">
-                  <span className="flex items-center gap-1"><Clock size={14} /> 25 Min</span>
-                  <span className="flex items-center gap-1"><Users size={14} /> 2 Servings</span>
-                  <span className="px-2 py-0.5 bg-secondary/10 text-secondary rounded-md font-bold uppercase tracking-wider">Healthy 🌱</span>
+                  <span className="flex items-center gap-1">
+                    <Clock size={14} /> 25 Min
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Users size={14} /> 2 Servings
+                  </span>
+                  <span className="px-2 py-0.5 bg-secondary/10 text-secondary rounded-md font-bold uppercase tracking-wider">
+                    Healthy
+                  </span>
                 </div>
                 <div className="mt-4">
                   <h4 className="text-sm font-display font-semibold text-foreground mb-2">Ingredients</h4>
@@ -249,11 +229,11 @@ const CookPage = () => {
                 <div className="mt-4">
                   <h4 className="text-sm font-display font-semibold text-foreground mb-2">Instructions</h4>
                   <ol className="space-y-2">
-                    <li className="text-sm text-muted-foreground font-body">1. Prep and dice all ingredients</li>
-                    <li className="text-sm text-muted-foreground font-body">2. Heat olive oil in a large pan</li>
-                    <li className="text-sm text-muted-foreground font-body">3. Sauté aromatics until golden</li>
-                    <li className="text-sm text-muted-foreground font-body">4. Add main ingredients, cook 10 min</li>
-                    <li className="text-sm text-muted-foreground font-body">5. Season and serve with fresh herbs</li>
+                    <li className="text-sm text-muted-foreground font-body">1. Prep and dice all ingredients.</li>
+                    <li className="text-sm text-muted-foreground font-body">2. Heat olive oil in a large pan.</li>
+                    <li className="text-sm text-muted-foreground font-body">3. Saute aromatics until golden.</li>
+                    <li className="text-sm text-muted-foreground font-body">4. Add main ingredients and cook for 10 minutes.</li>
+                    <li className="text-sm text-muted-foreground font-body">5. Season and serve with fresh herbs.</li>
                   </ol>
                 </div>
               </div>
@@ -261,25 +241,22 @@ const CookPage = () => {
           )}
         </AnimatePresence>
 
-        {/* Divider */}
         <div className="my-8 h-px bg-border" />
 
-        {/* Search Bar */}
         <div className="relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
           <input
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(event) => setSearch(event.target.value)}
             placeholder="Search food, recipes, ingredients..."
             className="w-full h-12 pl-11 pr-4 bg-card rounded-2xl shadow-soft text-sm font-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:shadow-card transition-all"
           />
         </div>
 
-        {/* Food Recommendations */}
         <div className="mt-6">
           <h2 className="text-xl font-display font-semibold text-foreground mb-4">
-            {search.trim() ? "Search Results" : "Recommended Recipes 🔥"}
+            {search.trim() ? "Search Results" : "Recommended Recipes"}
           </h2>
 
           {filtered.length === 0 ? (
@@ -288,15 +265,14 @@ const CookPage = () => {
             </div>
           ) : (
             <div className="flex flex-col gap-4">
-              {filtered.map((recipe, idx) => (
+              {filtered.map((recipe, index) => (
                 <motion.div
                   key={recipe.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.05 }}
+                  transition={{ delay: index * 0.05 }}
                   className="bg-card rounded-[20px] shadow-card overflow-hidden"
                 >
-                  {/* Card Header */}
                   <button
                     onClick={() => setExpandedRecipe(expandedRecipe === recipe.id ? null : recipe.id)}
                     className="w-full flex items-center gap-3 p-3 text-left"
@@ -307,7 +283,9 @@ const CookPage = () => {
                       className="w-20 h-20 rounded-2xl object-cover flex-shrink-0"
                     />
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-display font-semibold text-foreground text-sm leading-tight">{recipe.title}</h3>
+                      <h3 className="font-display font-semibold text-foreground text-sm leading-tight">
+                        {recipe.title}
+                      </h3>
                       <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                         <span className="flex items-center gap-1 text-[11px] text-muted-foreground font-body">
                           <Clock size={11} /> {recipe.time}
@@ -330,11 +308,12 @@ const CookPage = () => {
                     </div>
                     <ChevronRight
                       size={18}
-                      className={`text-muted-foreground transition-transform flex-shrink-0 ${expandedRecipe === recipe.id ? "rotate-90" : ""}`}
+                      className={`text-muted-foreground transition-transform flex-shrink-0 ${
+                        expandedRecipe === recipe.id ? "rotate-90" : ""
+                      }`}
                     />
                   </button>
 
-                  {/* Expanded Details */}
                   <AnimatePresence>
                     {expandedRecipe === recipe.id && (
                       <motion.div
@@ -344,29 +323,31 @@ const CookPage = () => {
                         className="overflow-hidden"
                       >
                         <div className="px-4 pb-4 pt-1 border-t border-border">
-                          {/* Full Image */}
                           <div className="rounded-2xl overflow-hidden mt-3 mb-4">
                             <img src={recipe.image} alt={recipe.title} className="w-full aspect-video object-cover" />
                           </div>
 
-                          {/* Ingredients */}
-                          <h4 className="text-sm font-display font-semibold text-foreground mb-2">🧾 Ingredients</h4>
+                          <p className="text-sm text-muted-foreground font-body mb-4">{recipe.description}</p>
+
+                          <h4 className="text-sm font-display font-semibold text-foreground mb-2">Ingredients</h4>
                           <ul className="space-y-1 mb-4">
-                            {recipe.ingredients.map((ing) => (
-                              <li key={ing} className="text-sm text-muted-foreground font-body flex items-center gap-2">
+                            {recipe.ingredients.map((ingredient) => (
+                              <li
+                                key={ingredient}
+                                className="text-sm text-muted-foreground font-body flex items-center gap-2"
+                              >
                                 <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
-                                {ing}
+                                {ingredient}
                               </li>
                             ))}
                           </ul>
 
-                          {/* Instructions */}
-                          <h4 className="text-sm font-display font-semibold text-foreground mb-2">📋 Instructions</h4>
+                          <h4 className="text-sm font-display font-semibold text-foreground mb-2">Instructions</h4>
                           <ol className="space-y-2">
-                            {recipe.instructions.map((step, i) => (
-                              <li key={i} className="text-sm text-muted-foreground font-body flex gap-2">
+                            {recipe.instructions.map((step, stepIndex) => (
+                              <li key={step} className="text-sm text-muted-foreground font-body flex gap-2">
                                 <span className="w-5 h-5 rounded-full bg-primary/10 text-primary flex-shrink-0 flex items-center justify-center text-[10px] font-bold mt-0.5">
-                                  {i + 1}
+                                  {stepIndex + 1}
                                 </span>
                                 {step}
                               </li>

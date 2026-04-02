@@ -1,20 +1,12 @@
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Heart, CalendarDays, Trash2, Plus } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { CalendarDays, Heart, Plus, Trash2 } from "lucide-react";
 import RecipeCard from "@/components/RecipeCard";
+import RestaurantCard from "@/components/RestaurantCard";
+import { recipes } from "@/data/recipes";
+import type { NearbyPlace } from "@/lib/nearbyPlaces";
 
-import pestoPasta from "@/assets/recipe-pesto-pasta.jpg";
-import smoothieBowl from "@/assets/recipe-smoothie-bowl.jpg";
-import avocadoToast from "@/assets/recipe-avocado-toast.jpg";
-
-const tabs = ["Recipes", "Restaurants", "Planner"];
-
-const savedRecipes = [
-  { image: pestoPasta, title: "Summer Pesto Pasta", time: "15 Min", tag: "Vegetarian 🌱", tagColor: "secondary" as const },
-  { image: smoothieBowl, title: "Acai Smoothie Bowl", time: "10 Min", tag: "Healthy", tagColor: "secondary" as const },
-  { image: avocadoToast, title: "Avocado Toast", time: "8 Min", tag: "Quick", tagColor: "primary" as const },
-];
-
+const savedRecipes = recipes.slice(0, 3);
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 type Meal = { id: string; name: string };
@@ -33,17 +25,23 @@ const initialMeals: WeekMeals = {
   Sun: [],
 };
 
-const FavoritesPage = () => {
+interface FavoritesPageProps {
+  favoriteRestaurants: NearbyPlace[];
+  onToggleFavoriteRestaurant: (restaurant: NearbyPlace) => void;
+}
+
+const FavoritesPage = ({ favoriteRestaurants, onToggleFavoriteRestaurant }: FavoritesPageProps) => {
   const [activeTab, setActiveTab] = useState("Recipes");
   const [selectedDay, setSelectedDay] = useState("Mon");
   const [weekMeals, setWeekMeals] = useState<WeekMeals>(initialMeals);
   const [isAdding, setIsAdding] = useState(false);
   const [newMealName, setNewMealName] = useState("");
+  const tabs = ["Recipes", `Restaurants (${favoriteRestaurants.length})`, "Planner"];
 
   const handleDeleteMeal = (day: string, mealId: string) => {
     setWeekMeals((prev) => ({
       ...prev,
-      [day]: prev[day].filter((m) => m.id !== mealId),
+      [day]: prev[day].filter((meal) => meal.id !== mealId),
     }));
   };
 
@@ -66,49 +64,80 @@ const FavoritesPage = () => {
           Favorites & Plan
         </h1>
 
-        {/* Tabs */}
         <div className="flex gap-1 mt-5 bg-muted rounded-full p-1">
-          {tabs.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-2 rounded-full text-xs font-medium font-body transition-all ${
-                activeTab === tab
-                  ? "bg-card text-foreground shadow-soft"
-                  : "text-muted-foreground"
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
+          {tabs.map((tab) => {
+            const tabValue = tab.startsWith("Restaurants") ? "Restaurants" : tab;
+
+            return (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tabValue)}
+                className={`flex-1 py-2 rounded-full text-xs font-medium font-body transition-all ${
+                  activeTab === tabValue ? "bg-card text-foreground shadow-soft" : "text-muted-foreground"
+                }`}
+              >
+                {tab}
+              </button>
+            );
+          })}
         </div>
 
-        {/* Content */}
         <div className="mt-5">
           {activeTab === "Recipes" && (
             <div className="grid grid-cols-2 gap-3">
-              {savedRecipes.map((r, i) => (
+              {savedRecipes.map((recipe, index) => (
                 <motion.div
-                  key={r.title}
+                  key={recipe.id}
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: i * 0.08 }}
+                  transition={{ delay: index * 0.08 }}
                 >
-                  <RecipeCard {...r} />
+                  <RecipeCard
+                    image={recipe.image}
+                    title={recipe.title}
+                    time={recipe.time}
+                    tag={recipe.tag}
+                    tagColor={recipe.tagColor}
+                  />
                 </motion.div>
               ))}
             </div>
           )}
 
           {activeTab === "Restaurants" && (
-            <div className="flex flex-col items-center py-12">
-              <p className="text-muted-foreground font-body text-sm">Your saved restaurants will appear here</p>
-            </div>
+            favoriteRestaurants.length > 0 ? (
+              <div className="flex flex-col gap-3">
+                {favoriteRestaurants.map((restaurant, index) => (
+                  <motion.div
+                    key={restaurant.id}
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.06 }}
+                  >
+                    <RestaurantCard
+                      address={restaurant.address}
+                      badges={[restaurant.primaryType, restaurant.isOpenNow ? "Open Now" : null].filter(Boolean) as string[]}
+                      distance={restaurant.distanceText}
+                      imageUrl={restaurant.imageUrl}
+                      isFavorited
+                      mapsUrl={restaurant.mapsUrl}
+                      name={restaurant.name}
+                      onToggleFavorite={() => onToggleFavoriteRestaurant(restaurant)}
+                      photoAttributions={restaurant.photoAttributions}
+                      rating={restaurant.rating}
+                    />
+                  </motion.div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center py-12">
+                <p className="text-muted-foreground font-body text-sm">Your saved restaurants will appear here</p>
+              </div>
+            )
           )}
 
           {activeTab === "Planner" && (
             <div className="space-y-4">
-              {/* Day selector pills */}
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {days.map((day) => (
                   <button
@@ -125,7 +154,6 @@ const FavoritesPage = () => {
                 ))}
               </div>
 
-              {/* Meal list */}
               <AnimatePresence mode="wait">
                 <motion.div
                   key={selectedDay}
@@ -161,7 +189,6 @@ const FavoritesPage = () => {
                     </p>
                   )}
 
-                  {/* Add meal input */}
                   {isAdding ? (
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
@@ -171,8 +198,8 @@ const FavoritesPage = () => {
                       <input
                         autoFocus
                         value={newMealName}
-                        onChange={(e) => setNewMealName(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && handleAddMeal()}
+                        onChange={(event) => setNewMealName(event.target.value)}
+                        onKeyDown={(event) => event.key === "Enter" && handleAddMeal()}
                         placeholder="Enter meal name..."
                         className="flex-1 bg-card border border-border rounded-2xl px-4 py-3 text-sm font-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                       />
@@ -183,10 +210,13 @@ const FavoritesPage = () => {
                         Add
                       </button>
                       <button
-                        onClick={() => { setIsAdding(false); setNewMealName(""); }}
+                        onClick={() => {
+                          setIsAdding(false);
+                          setNewMealName("");
+                        }}
                         className="px-3 py-3 bg-muted text-muted-foreground rounded-2xl text-sm font-body"
                       >
-                        ✕
+                        X
                       </button>
                     </motion.div>
                   ) : (

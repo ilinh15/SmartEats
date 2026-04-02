@@ -1,15 +1,13 @@
 import { motion } from "framer-motion";
 import { Search } from "lucide-react";
 import heroImg from "@/assets/hero-breakfast.jpg";
+import { getMealTimeContent } from "@/lib/mealTime";
 
 const HeroSection = () => {
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
-  const mealSuggestion = hour < 12 ? "Ready for some Cinnamon Oats?" : hour < 17 ? "How about a fresh salad?" : "Time for a cozy dinner?";
+  const { greeting, heroSuggestion } = getMealTimeContent();
 
   return (
     <section className="relative overflow-hidden rounded-b-[32px]" style={{ background: "var(--hero-gradient)" }}>
-      {/* Decorative blobs */}
       <div className="absolute top-10 right-[-40px] w-48 h-48 rounded-full bg-primary/5 animate-pulse-soft" />
       <div className="absolute bottom-[-20px] left-[-30px] w-32 h-32 rounded-full bg-secondary/10 animate-float" />
 
@@ -21,7 +19,7 @@ const HeroSection = () => {
               animate={{ opacity: 1, y: 0 }}
               className="text-sm text-muted-foreground font-body"
             >
-              {greeting}, Alex 👋
+              {greeting}, Alex
             </motion.p>
             <motion.h1
               initial={{ opacity: 0, y: 10 }}
@@ -29,7 +27,7 @@ const HeroSection = () => {
               transition={{ delay: 0.1 }}
               className="text-2xl font-display font-semibold text-foreground mt-1"
             >
-              {mealSuggestion}
+              {heroSuggestion}
             </motion.h1>
           </div>
           <motion.div
@@ -43,7 +41,6 @@ const HeroSection = () => {
           </motion.div>
         </div>
 
-        {/* Search Bar */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}

@@ -1,65 +1,186 @@
+import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import HeroSection from "@/components/HeroSection";
-import RecipeCard from "@/components/RecipeCard";
-import RestaurantCard from "@/components/RestaurantCard";
 import QuickActions from "@/components/QuickActions";
-
-import pestoPasta from "@/assets/recipe-pesto-pasta.jpg";
-import smoothieBowl from "@/assets/recipe-smoothie-bowl.jpg";
-import avocadoToast from "@/assets/recipe-avocado-toast.jpg";
-import salad from "@/assets/recipe-salad.jpg";
-import chocolateCake from "@/assets/recipe-chocolate-cake.jpg";
-
-const recipes = [
-  { image: pestoPasta, title: "Summer Pesto Pasta", time: "15 Min", tag: "Vegetarian 🌱", tagColor: "secondary" as const },
-  { image: smoothieBowl, title: "Acai Smoothie Bowl", time: "10 Min", tag: "Healthy", tagColor: "secondary" as const },
-  { image: avocadoToast, title: "Avocado Toast", time: "8 Min", tag: "Quick", tagColor: "primary" as const },
-  { image: salad, title: "Greek Chicken Salad", time: "20 Min", tag: "High Protein", tagColor: "primary" as const },
-  { image: chocolateCake, title: "Chocolate Lava Cake", time: "30 Min", tag: "Dessert", tagColor: "primary" as const },
-];
-
-const restaurants = [
-  { name: "The Green Bowl", distance: "0.8 km", rating: 4.8, image: salad, badges: ["Vegetarian", "Halal"] },
-  { name: "Pasta Paradise", distance: "1.2 km", rating: 4.6, image: pestoPasta, badges: ["Italian"] },
-  { name: "Morning Bloom Café", distance: "0.5 km", rating: 4.9, image: smoothieBowl, badges: ["Breakfast", "Vegan"] },
-];
+import RestaurantCard from "@/components/RestaurantCard";
+import { getCurrentPosition, type GeolocationFailure } from "@/lib/geolocation";
+import { getMealTimeContent } from "@/lib/mealTime";
+import { searchMealRecommendations, searchNearbyPlaces, type NearbyPlace } from "@/lib/nearbyPlaces";
 
 interface HomePageProps {
   onNavigate: (tab: string) => void;
+  favoriteRestaurantIds: ReadonlySet<string>;
+  onToggleFavoriteRestaurant: (restaurant: NearbyPlace) => void;
 }
 
-const HomePage = ({ onNavigate }: HomePageProps) => {
+const HomePage = ({ onNavigate, favoriteRestaurantIds, onToggleFavoriteRestaurant }: HomePageProps) => {
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+  const mealContent = useMemo(() => getMealTimeContent(currentTime), [currentTime]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60_000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const locationQuery = useQuery({
+    queryKey: ["home-current-location"],
+    queryFn: getCurrentPosition,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+
+  const coordinates = locationQuery.data;
+
+  const recommendedQuery = useQuery({
+    queryKey: [
+      "home-meal-recommendations",
+      mealContent.mealPeriod,
+      coordinates?.lat ?? null,
+      coordinates?.lng ?? null,
+    ],
+    enabled: !!coordinates,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    queryFn: async () =>
+      searchMealRecommendations({
+        lat: coordinates!.lat,
+        lng: coordinates!.lng,
+        mealPeriod: mealContent.mealPeriod,
+      }),
+  });
+
+  const nearbyQuery = useQuery({
+    queryKey: ["home-nearby-food", coordinates?.lat ?? null, coordinates?.lng ?? null],
+    enabled: !!coordinates,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    queryFn: async () =>
+      searchNearbyPlaces({
+        lat: coordinates!.lat,
+        lng: coordinates!.lng,
+        filter: "All",
+      }),
+  });
+
+  const recommendedPlaces = (recommendedQuery.data ?? []).slice(0, 3);
+  const nearbyPlaces = (nearbyQuery.data ?? []).slice(0, 3);
+
+  const locationErrorMessage =
+    locationQuery.error && (locationQuery.error as GeolocationFailure).message
+      ? (locationQuery.error as GeolocationFailure).message
+      : null;
+
+  const renderLivePlaceCards = (
+    places: typeof recommendedPlaces,
+    isLoading: boolean,
+    error: Error | null,
+    emptyMessage: string,
+  ) => {
+    if (locationQuery.isLoading || isLoading) {
+      return (
+        <div className="bg-card rounded-[20px] shadow-card p-5">
+          <p className="text-sm font-body text-muted-foreground">Loading live food recommendations...</p>
+        </div>
+      );
+    }
+
+    if (!coordinates) {
+      return (
+        <div className="bg-card rounded-[20px] shadow-card p-5">
+          <p className="text-sm font-body text-foreground">Allow location access to load time-based nearby food picks.</p>
+          {locationErrorMessage && (
+            <p className="text-xs font-body text-muted-foreground mt-1">{locationErrorMessage}</p>
+          )}
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className="bg-card rounded-[20px] shadow-card p-5">
+          <p className="text-sm font-body text-foreground">Could not load live restaurant recommendations right now.</p>
+          <p className="text-xs font-body text-muted-foreground mt-1">
+            {error.message.includes("VITE_GOOGLE_MAPS_API_KEY")
+              ? "Add VITE_GOOGLE_MAPS_API_KEY to enable Google Places results."
+              : error.message}
+          </p>
+        </div>
+      );
+    }
+
+    if (places.length === 0) {
+      return <p className="text-sm font-body text-muted-foreground py-6">{emptyMessage}</p>;
+    }
+
+    return (
+      <div className="flex flex-col gap-3">
+        {places.map((place) => (
+          <RestaurantCard
+            key={place.id}
+            address={place.address}
+            badges={[place.primaryType, place.isOpenNow ? "Open Now" : null].filter(Boolean) as string[]}
+            distance={place.distanceText}
+            imageUrl={place.imageUrl}
+            isFavorited={favoriteRestaurantIds.has(place.id)}
+            mapsUrl={place.mapsUrl}
+            name={place.name}
+            onToggleFavorite={() => onToggleFavoriteRestaurant(place)}
+            photoAttributions={place.photoAttributions}
+            rating={place.rating}
+          />
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className="pb-20">
       <HeroSection />
 
       <div className="px-5 mt-6">
-        {/* Quick Actions */}
         <QuickActions onAction={onNavigate} />
 
-        {/* Recipe Recommendations */}
         <div className="mt-8">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-display font-semibold text-foreground">Recommended for You</h2>
-            <button className="text-xs font-body text-primary font-medium">See all</button>
+            <div>
+              <h2 className="text-xl font-display font-semibold text-foreground">
+                {mealContent.mealLabel} Picks for You
+              </h2>
+              <p className="text-xs font-body text-muted-foreground mt-1">
+                Live restaurant recommendations based on your current local time
+              </p>
+            </div>
+            <button className="text-xs font-body text-primary font-medium" onClick={() => onNavigate("nearby")}>
+              See all
+            </button>
           </div>
-          <div className="flex gap-3 overflow-x-auto pb-2 -mx-5 px-5 scrollbar-hide">
-            {recipes.map((recipe) => (
-              <RecipeCard key={recipe.title} {...recipe} />
-            ))}
-          </div>
+          {renderLivePlaceCards(
+            recommendedPlaces,
+            recommendedQuery.isLoading,
+            recommendedQuery.error as Error | null,
+            `No ${mealContent.mealLabel.toLowerCase()} recommendations found nearby right now.`,
+          )}
         </div>
 
-        {/* Nearby Restaurants */}
         <div className="mt-8">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-display font-semibold text-foreground">Nearby Restaurants</h2>
-            <button className="text-xs font-body text-primary font-medium" onClick={() => onNavigate("nearby")}>See all</button>
+            <div>
+              <h2 className="text-xl font-display font-semibold text-foreground">Nearby Food</h2>
+              <p className="text-xs font-body text-muted-foreground mt-1">Live nearby food stalls and restaurants around you</p>
+            </div>
+            <button className="text-xs font-body text-primary font-medium" onClick={() => onNavigate("nearby")}>
+              See all
+            </button>
           </div>
-          <div className="flex flex-col gap-3">
-            {restaurants.map((r) => (
-              <RestaurantCard key={r.name} {...r} />
-            ))}
-          </div>
+          {renderLivePlaceCards(
+            nearbyPlaces,
+            nearbyQuery.isLoading,
+            nearbyQuery.error as Error | null,
+            "No nearby food spots found around your current location.",
+          )}
         </div>
       </div>
     </div>
