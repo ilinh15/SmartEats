@@ -4,14 +4,16 @@ import App from "@/App";
 
 describe("recipe detail pages", () => {
   beforeEach(() => {
+    window.localStorage.clear();
     window.history.pushState({}, "", "/");
   });
 
   afterEach(() => {
+    window.localStorage.clear();
     window.history.pushState({}, "", "/");
   });
 
-  it("renders stored recipe information from the route id", async () => {
+  it("renders stored recipe information from the legacy route id", async () => {
     window.history.pushState({}, "", "/recipes/chocolate-lava-cake");
 
     render(<App />);
@@ -20,6 +22,20 @@ describe("recipe detail pages", () => {
     expect(screen.getByText(/rich dessert with a soft sponge exterior/i)).toBeInTheDocument();
     expect(screen.getByText("Dark chocolate")).toBeInTheDocument();
     expect(screen.getByText(/bake in greased ramekins at 200 c for 12 minutes/i)).toBeInTheDocument();
+  });
+
+  it("renders cooking recommendation details from the recommendation repository", async () => {
+    window.history.pushState({}, "", "/recipes/tamago-sando");
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: /tamago sando/i })).toBeInTheDocument();
+    expect(screen.getByText(/creamy japanese egg salad/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/^Japanese$/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/^Breakfast$/i).length).toBeGreaterThan(0);
+    expect(screen.getByText("Japanese mayo")).toBeInTheDocument();
+    expect(screen.getByText(/sandwich the egg filling between the bread/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /save tamago sando to favorites/i })).toBeInTheDocument();
   });
 
   it("shows the not found page for an invalid recipe id", async () => {
@@ -44,7 +60,7 @@ describe("recipe detail pages", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: /nearby food/i })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: /recommend to cook today/i })).toBeInTheDocument();
     });
     expect(window.location.pathname).toBe("/");
   });

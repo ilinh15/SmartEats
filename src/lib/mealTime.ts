@@ -1,4 +1,4 @@
-export type MealPeriod = "breakfast" | "lunch" | "dinner";
+export type MealPeriod = "breakfast" | "lunch" | "dinner" | "supper";
 
 interface MealTimeContent {
   greeting: string;
@@ -24,25 +24,40 @@ const MEAL_COPY: Record<MealPeriod, Omit<MealTimeContent, "greeting" | "mealPeri
     mealLabel: "Dinner",
     mealSearchQuery: "best dinner restaurants and food stalls",
   },
+  supper: {
+    heroSuggestion: "Looking for a light supper nearby?",
+    mealLabel: "Supper",
+    mealSearchQuery: "best supper food stalls and late-night cafes",
+  },
 };
 
 export const getMealPeriod = (date: Date = new Date()): MealPeriod => {
   const hour = date.getHours();
 
-  if (hour < 11) {
+  if (hour < 5) {
+    return "supper";
+  }
+
+  if (hour >= 5 && hour < 11) {
     return "breakfast";
   }
 
-  if (hour < 17) {
+  if (hour < 16) {
     return "lunch";
   }
 
-  return "dinner";
+  if (hour < 22) {
+    return "dinner";
+  }
+
+  return "supper";
 };
 
 export const getMealTimeContent = (date: Date = new Date()): MealTimeContent => {
   const mealPeriod = getMealPeriod(date);
-  const greeting = date.getHours() < 12 ? "Good morning" : date.getHours() < 17 ? "Good afternoon" : "Good evening";
+  const hour = date.getHours();
+  const greeting =
+    hour < 5 ? "Good evening" : hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
   return {
     greeting,

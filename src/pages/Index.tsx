@@ -5,7 +5,9 @@ import CookPage from "@/pages/CookPage";
 import NearbyPage from "@/pages/NearbyPage";
 import FavoritesPage from "@/pages/FavoritesPage";
 import ProfilePage from "@/pages/ProfilePage";
+import type { CookingRecommendation } from "@/lib/cookingRecommendations";
 import type { NearbyPlace } from "@/lib/nearbyPlaces";
+import { loadFavoriteRecipes, saveFavoriteRecipes, toggleFavoriteRecipe } from "@/lib/recipeFavorites";
 import { loadFavoriteRestaurants, saveFavoriteRestaurants } from "@/lib/restaurantFavorites";
 
 type Tab = "home" | "cook" | "nearby" | "favorites" | "profile";
@@ -13,15 +15,21 @@ type Tab = "home" | "cook" | "nearby" | "favorites" | "profile";
 const Index = () => {
   const [activeTab, setActiveTab] = useState<Tab>("home");
   const [favoriteRestaurants, setFavoriteRestaurants] = useState<NearbyPlace[]>(() => loadFavoriteRestaurants());
+  const [favoriteRecipes, setFavoriteRecipes] = useState(() => loadFavoriteRecipes());
 
   useEffect(() => {
     saveFavoriteRestaurants(favoriteRestaurants);
   }, [favoriteRestaurants]);
 
+  useEffect(() => {
+    saveFavoriteRecipes(favoriteRecipes);
+  }, [favoriteRecipes]);
+
   const favoriteRestaurantIds = useMemo(
     () => new Set(favoriteRestaurants.map((restaurant) => restaurant.id)),
     [favoriteRestaurants],
   );
+  const favoriteRecipeIds = useMemo(() => new Set(favoriteRecipes.map((recipe) => recipe.id)), [favoriteRecipes]);
 
   const handleNavigate = (tab: string) => {
     const validTabs: Tab[] = ["home", "cook", "nearby", "favorites", "profile"];
@@ -46,13 +54,19 @@ const Index = () => {
     });
   };
 
+  const handleToggleFavoriteRecipe = (recipe: CookingRecommendation) => {
+    setFavoriteRecipes((currentFavorites) => toggleFavoriteRecipe(currentFavorites, recipe));
+  };
+
   return (
     <div className="min-h-screen bg-background max-w-lg mx-auto relative">
       {activeTab === "home" && (
         <HomePage
           favoriteRestaurantIds={favoriteRestaurantIds}
+          favoriteRecipeIds={favoriteRecipeIds}
           onNavigate={handleNavigate}
           onToggleFavoriteRestaurant={handleToggleFavoriteRestaurant}
+          onToggleFavoriteRecipe={handleToggleFavoriteRecipe}
         />
       )}
       {activeTab === "cook" && <CookPage />}
@@ -64,7 +78,9 @@ const Index = () => {
       )}
       {activeTab === "favorites" && (
         <FavoritesPage
+          favoriteRecipes={favoriteRecipes}
           favoriteRestaurants={favoriteRestaurants}
+          onToggleFavoriteRecipe={handleToggleFavoriteRecipe}
           onToggleFavoriteRestaurant={handleToggleFavoriteRestaurant}
         />
       )}

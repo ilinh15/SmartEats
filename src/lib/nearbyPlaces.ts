@@ -77,6 +77,7 @@ const MEAL_QUERY_MAP: Record<MealPeriod, string> = {
   breakfast: "best breakfast cafes and food stalls",
   lunch: "best lunch restaurants and food stalls",
   dinner: "best dinner restaurants and food stalls",
+  supper: "best supper food stalls and late-night cafes",
 };
 
 const dedupePlaces = (places: NearbyPlace[]) => {

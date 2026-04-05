@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CalendarDays, Heart, Plus, Trash2 } from "lucide-react";
-import RecipeCard from "@/components/RecipeCard";
+import { useNavigate } from "react-router-dom";
+import CookingRecommendationCard from "@/components/CookingRecommendationCard";
 import RestaurantCard from "@/components/RestaurantCard";
-import { recipes } from "@/data/recipes";
+import type { CookingRecommendation } from "@/lib/cookingRecommendations";
 import type { NearbyPlace } from "@/lib/nearbyPlaces";
+import type { SavedRecipe } from "@/lib/recipeFavorites";
 
-const savedRecipes = recipes.slice(0, 3);
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 type Meal = { id: string; name: string };
@@ -26,17 +27,25 @@ const initialMeals: WeekMeals = {
 };
 
 interface FavoritesPageProps {
+  favoriteRecipes: SavedRecipe[];
   favoriteRestaurants: NearbyPlace[];
+  onToggleFavoriteRecipe: (recipe: CookingRecommendation) => void;
   onToggleFavoriteRestaurant: (restaurant: NearbyPlace) => void;
 }
 
-const FavoritesPage = ({ favoriteRestaurants, onToggleFavoriteRestaurant }: FavoritesPageProps) => {
+const FavoritesPage = ({
+  favoriteRecipes,
+  favoriteRestaurants,
+  onToggleFavoriteRecipe,
+  onToggleFavoriteRestaurant,
+}: FavoritesPageProps) => {
   const [activeTab, setActiveTab] = useState("Recipes");
   const [selectedDay, setSelectedDay] = useState("Mon");
   const [weekMeals, setWeekMeals] = useState<WeekMeals>(initialMeals);
   const [isAdding, setIsAdding] = useState(false);
   const [newMealName, setNewMealName] = useState("");
   const tabs = ["Recipes", `Restaurants (${favoriteRestaurants.length})`, "Planner"];
+  const navigate = useNavigate();
 
   const handleDeleteMeal = (day: string, mealId: string) => {
     setWeekMeals((prev) => ({
@@ -84,24 +93,30 @@ const FavoritesPage = ({ favoriteRestaurants, onToggleFavoriteRestaurant }: Favo
 
         <div className="mt-5">
           {activeTab === "Recipes" && (
-            <div className="grid grid-cols-2 gap-3">
-              {savedRecipes.map((recipe, index) => (
-                <motion.div
-                  key={recipe.id}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: index * 0.08 }}
-                >
-                  <RecipeCard
-                    image={recipe.image}
-                    title={recipe.title}
-                    time={recipe.time}
-                    tag={recipe.tag}
-                    tagColor={recipe.tagColor}
-                  />
-                </motion.div>
-              ))}
-            </div>
+            favoriteRecipes.length > 0 ? (
+              <div className="flex flex-col gap-3">
+                {favoriteRecipes.map((recipe, index) => (
+                  <motion.div
+                    key={recipe.id}
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.06 }}
+                  >
+                    <CookingRecommendationCard
+                      recommendation={recipe}
+                      className="w-full"
+                      isFavorited
+                      onSelect={() => navigate(`/recipes/${recipe.id}`)}
+                      onToggleFavorite={onToggleFavoriteRecipe}
+                    />
+                  </motion.div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center py-12">
+                <p className="text-muted-foreground font-body text-sm">Save recipes from Home to see them here</p>
+              </div>
+            )
           )}
 
           {activeTab === "Restaurants" && (

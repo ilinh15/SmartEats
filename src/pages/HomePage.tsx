@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import CookingRecommendationSection from "@/components/CookingRecommendationSection";
 import HeroSection from "@/components/HeroSection";
 import QuickActions from "@/components/QuickActions";
 import RestaurantCard from "@/components/RestaurantCard";
+import type { CookingRecommendation } from "@/lib/cookingRecommendations";
 import { getCurrentPosition, type GeolocationFailure } from "@/lib/geolocation";
 import { getMealTimeContent } from "@/lib/mealTime";
 import { searchMealRecommendations, searchNearbyPlaces, type NearbyPlace } from "@/lib/nearbyPlaces";
@@ -10,10 +12,18 @@ import { searchMealRecommendations, searchNearbyPlaces, type NearbyPlace } from 
 interface HomePageProps {
   onNavigate: (tab: string) => void;
   favoriteRestaurantIds: ReadonlySet<string>;
+  favoriteRecipeIds: ReadonlySet<string>;
   onToggleFavoriteRestaurant: (restaurant: NearbyPlace) => void;
+  onToggleFavoriteRecipe: (recipe: CookingRecommendation) => void;
 }
 
-const HomePage = ({ onNavigate, favoriteRestaurantIds, onToggleFavoriteRestaurant }: HomePageProps) => {
+const HomePage = ({
+  onNavigate,
+  favoriteRestaurantIds,
+  favoriteRecipeIds,
+  onToggleFavoriteRestaurant,
+  onToggleFavoriteRecipe,
+}: HomePageProps) => {
   const [currentTime, setCurrentTime] = useState(() => new Date());
   const mealContent = useMemo(() => getMealTimeContent(currentTime), [currentTime]);
 
@@ -143,14 +153,20 @@ const HomePage = ({ onNavigate, favoriteRestaurantIds, onToggleFavoriteRestauran
       <div className="px-5 mt-6">
         <QuickActions onAction={onNavigate} />
 
+        <CookingRecommendationSection
+          mealType={mealContent.mealPeriod}
+          favoriteRecipeIds={favoriteRecipeIds}
+          onToggleFavoriteRecipe={onToggleFavoriteRecipe}
+        />
+
         <div className="mt-8">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-xl font-display font-semibold text-foreground">
-                {mealContent.mealLabel} Picks for You
+                Nearby {mealContent.mealLabel} Picks for You
               </h2>
               <p className="text-xs font-body text-muted-foreground mt-1">
-                Live restaurant recommendations based on your current local time
+                Live restaurant recommendations nearby
               </p>
             </div>
             <button className="text-xs font-body text-primary font-medium" onClick={() => onNavigate("nearby")}>
