@@ -24,7 +24,7 @@ export default defineConfig(({ mode }) => {
       mode === "development" && componentTagger(),
       {
         name: "dev-ai-recipe-api",
-        configureServer(server) {
+        configureServer(server: any) {
           let resolvedGeminiModelPromise: Promise<string> | undefined;
 
           const resolveGeminiModel = async (): Promise<string> => {
@@ -35,7 +35,7 @@ export default defineConfig(({ mode }) => {
             const resp = await fetch(
               `https://generativelanguage.googleapis.com/v1beta/models?key=${geminiApiKey}`,
             );
-            const json = await resp.json().catch(() => null);
+            const json: any = await resp.json().catch(() => null);
 
             const models: any[] = Array.isArray(json?.models) ? json.models : [];
             const supportsGenerateContent = (m: any) =>
@@ -167,7 +167,7 @@ ${rawText}`;
                 }),
               },
             );
-            const upstreamJson = await upstream.json().catch(() => null);
+            const upstreamJson: any = await upstream.json().catch(() => null);
 
             if (!upstream.ok) {
               const message = upstreamJson?.error?.message || upstream.statusText || "Gemini request failed";
@@ -195,7 +195,7 @@ ${rawText}`;
                 max_tokens: 1000,
               }),
             });
-            const upstreamJson = await upstream.json().catch(() => null);
+            const upstreamJson: any = await upstream.json().catch(() => null);
 
             if (!upstream.ok) {
               const message = upstreamJson?.error?.message || upstream.statusText || "Mistral request failed";
@@ -225,7 +225,7 @@ ${rawText}`;
             return { provider, recipe: parsedRecipe.recipe };
           };
 
-          server.middlewares.use("/api/generate-recipe", async (req, res) => {
+          server.middlewares.use("/api/generate-recipe", async (req: any, res: any) => {
             try {
               if (req.method !== "POST") {
                 res.statusCode = 405;
@@ -253,7 +253,7 @@ ${rawText}`;
 
               const body = await new Promise<string>((resolve, reject) => {
                 let data = "";
-                req.on("data", (chunk) => {
+                req.on("data", (chunk: any) => {
                   data += chunk;
                 });
                 req.on("end", () => resolve(data));
