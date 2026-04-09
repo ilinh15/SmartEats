@@ -1,186 +1,239 @@
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
-import { User, Leaf, LogOut, ChevronRight, Bell, Shield, HelpCircle } from "lucide-react";
+import {
+  User, Leaf, LogOut, ChevronRight, Bell, Shield, HelpCircle,
+  Settings, Pencil, X, Lock, Mail, MessageSquare, FileText, Eye, Database, Trash2,
+  Phone, Info, BookOpen, ExternalLink, BellRing, BellOff, Volume2
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { signOut, onAuthStateChanged, getAuth } from "firebase/auth";
-import { getDoc, doc, setDoc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 
 const PREFERENCE_OPTIONS = [
-  "Halal",
-  "Economy",
-  "Gluten-Free",
-  "Vegan",
-  "Vegetarian",
-  "Low Carb",
-] as const;
-
-const menuItems = [
-  { label: "Notifications", icon: Bell },
-  { label: "Privacy & Security", icon: Shield },
-  { label: "Help & Support", icon: HelpCircle },
+  "Halal", "Economy", "Gluten-Free", "Vegan", "Vegetarian",
+  "Low Carb", "Dairy-Free", "Nut-Free", "Pescatarian", "Keto",
 ];
+
+type DialogType = "settings" | "notifications" | "privacy" | "help" | null;
 
 const ProfilePage = () => {
   const navigate = useNavigate();
-  const auth = getAuth();
   const [username, setUsername] = useState("User");
   const [userId, setUserId] = useState<string | null>(null);
   const [selectedPreferences, setSelectedPreferences] = useState<string[]>([]);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [editingPrefs, setEditingPrefs] = useState(false);
+  const [activeDialog, setActiveDialog] = useState<DialogType>(null);
+
+  // Settings state
+  const [editName, setEditName] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsMsg, setSettingsMsg] = useState<string | null>(null);
+
+  // Notification prefs (local UI only)
+  const [pushEnabled, setPushEnabled] = useState(true);
+  const [emailNotifs, setEmailNotifs] = useState(true);
+  const [mealReminders, setMealReminders] = useState(true);
 
   useEffect(() => {
-    if (!statusMessage) {
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      setStatusMessage(null);
-    }, 6000);
-
+    if (!statusMessage) return;
+    const timer = window.setTimeout(() => setStatusMessage(null), 4000);
     return () => window.clearTimeout(timer);
   }, [statusMessage]);
 
   useEffect(() => {
-    if (!auth || !db) {
-      return;
-    }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        const user = session.user;
+        setUserId(user.id);
+        const displayName = user.user_metadata?.display_name || user.email?.split("@")[0] || "User";
+        setUsername(displayName);
+        setEditName(displayName);
 
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user && db) {
-        setUserId(user.uid);
-
-        try {
-          const userDoc = await getDoc(doc(db, "users", user.uid));
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            setUsername(userData?.username || user.email || "User");
-            setSelectedPreferences(
-              Array.isArray(userData?.preferences)
-                ? userData.preferences.filter((pref: string) => PREFERENCE_OPTIONS.includes(pref as typeof PREFERENCE_OPTIONS[number]))
-                : [],
-            );
-          }
-        } catch (error) {
-          console.error("Failed to load profile data:", error);
-          setUsername(user.email || "User");
-        }
+        // Load preferences
+        const { data } = await supabase
+          .from("user_dietary_preferences")
+          .select("preference")
+          .eq("user_id", user.id);
+        if (data) setSelectedPreferences(data.map((d) => d.preference));
       }
     });
-
-    return unsubscribe;
-  }, [auth]);
+    return () => subscription.unsubscribe();
+  }, []);
 
   const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      navigate("/login");
-    } catch (error) {
-      console.error("Logout error:", error);
-    }
+    await supabase.auth.signOut();
+    navigate("/login");
   };
 
   const togglePreference = (pref: string) => {
-    setSelectedPreferences((current) =>
-      current.includes(pref) ? current.filter((item) => item !== pref) : [...current, pref],
+    setSelectedPreferences((cur) =>
+      cur.includes(pref) ? cur.filter((p) => p !== pref) : [...cur, pref]
     );
-    setStatusMessage(null);
   };
 
   const handleSavePreferences = async () => {
-    if (!userId || !db) {
-      setStatusMessage("Unable to save preferences right now.");
+    if (!userId) return;
+    setSaving(true);
+    // Delete existing, then insert new
+    await supabase.from("user_dietary_preferences").delete().eq("user_id", userId);
+    if (selectedPreferences.length > 0) {
+      await supabase.from("user_dietary_preferences").insert(
+        selectedPreferences.map((p) => ({ user_id: userId, preference: p }))
+      );
+    }
+    setSaving(false);
+    setEditingPrefs(false);
+    setStatusMessage("Preferences updated!");
+  };
+
+  const handleUpdateName = async () => {
+    if (!editName.trim()) return;
+    setSettingsSaving(true);
+    setSettingsMsg(null);
+    const { error } = await supabase.auth.updateUser({
+      data: { display_name: editName.trim() },
+    });
+    if (error) {
+      setSettingsMsg("Failed to update name.");
+    } else {
+      setUsername(editName.trim());
+      // Also update profiles table
+      if (userId) {
+        await supabase.from("profiles").update({ display_name: editName.trim() }).eq("user_id", userId);
+      }
+      setSettingsMsg("Name updated!");
+    }
+    setSettingsSaving(false);
+  };
+
+  const handleUpdatePassword = async () => {
+    setSettingsMsg(null);
+    if (newPassword.length < 6) {
+      setSettingsMsg("Password must be at least 6 characters.");
       return;
     }
-
-    setSaving(true);
-    setStatusMessage(null);
-
-    try {
-      await setDoc(
-        doc(db, "users", userId),
-        { preferences: selectedPreferences, updatedAt: new Date().toISOString() },
-        { merge: true },
-      );
-      setStatusMessage("Preferences updated successfully.");
-    } catch (error) {
-      console.error("Failed to save preferences:", error);
-      setStatusMessage("Could not update preferences. Please try again.");
-    } finally {
-      setSaving(false);
+    if (newPassword !== confirmPassword) {
+      setSettingsMsg("Passwords do not match.");
+      return;
     }
+    setSettingsSaving(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      setSettingsMsg("Failed to update password.");
+    } else {
+      setSettingsMsg("Password updated!");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    }
+    setSettingsSaving(false);
+  };
+
+  const openDialog = (type: DialogType) => {
+    setActiveDialog(type);
+    setSettingsMsg(null);
   };
 
   return (
-    <div className="pb-20 min-h-screen">
+    <div className="pb-20 min-h-screen bg-background">
+      {/* Header */}
       <div className="relative overflow-hidden rounded-b-[32px] px-5 pt-12 pb-8" style={{ background: "var(--hero-gradient)" }}>
         <div className="absolute top-6 right-[-30px] w-40 h-40 rounded-full bg-primary/5 animate-pulse-soft" />
-
         <div className="flex items-center gap-4">
           <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center shadow-card">
             <User size={32} className="text-muted-foreground" />
           </div>
-          <div>
+          <div className="flex-1">
             <h1 className="text-xl font-display font-semibold text-foreground">{username}</h1>
             <p className="text-sm text-muted-foreground font-body">Home cook & foodie</p>
           </div>
+          <button onClick={() => openDialog("settings")} className="p-2 rounded-full bg-card/80 shadow-soft">
+            <Settings size={20} className="text-muted-foreground" />
+          </button>
         </div>
       </div>
 
       <div className="px-5 mt-6">
-        {statusMessage ? (
-          <Alert className="mb-6 border-emerald-200 bg-emerald-50 text-emerald-900 shadow-sm">
+        {statusMessage && (
+          <Alert className="mb-4 border-secondary/30 bg-secondary/10 text-foreground shadow-sm">
             <AlertDescription>{statusMessage}</AlertDescription>
           </Alert>
-        ) : null}
+        )}
 
         {/* Dietary Preferences */}
-        <div>
-          <h2 className="text-base font-display font-semibold text-foreground flex items-center gap-2 mb-3">
-            <Leaf size={18} className="text-secondary" />
-            Dietary Preferences
-          </h2>
-          <div className="flex flex-wrap gap-2">
-            {PREFERENCE_OPTIONS.map((pref) => {
-              const active = selectedPreferences.includes(pref);
-
-              return (
-                <motion.button
-                  key={pref}
-                  type="button"
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => togglePreference(pref)}
-                  className={`px-4 py-2 rounded-full text-xs font-medium font-body transition-all ${
-                    active
-                      ? "bg-secondary text-secondary-foreground shadow-elevated"
-                      : "bg-card text-foreground shadow-soft hover:bg-accent"
-                  }`}
-                >
-                  {pref}
-                </motion.button>
-              );
-            })}
-          </div>
-          <div className="mt-4 flex flex-col gap-3">
-            <button
-              type="button"
-              onClick={handleSavePreferences}
-              disabled={saving}
-              className="w-full rounded-full bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {saving ? "Saving preferences..." : "Save Preferences"}
+        <div className="bg-card rounded-2xl p-4 shadow-soft">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-display font-semibold text-foreground flex items-center gap-2">
+              <Leaf size={18} className="text-secondary" />
+              Dietary Preferences
+            </h2>
+            <button onClick={() => setEditingPrefs(!editingPrefs)} className="text-xs font-medium text-primary flex items-center gap-1">
+              <Pencil size={14} />
+              {editingPrefs ? "Cancel" : "Edit"}
             </button>
           </div>
+
+          {!editingPrefs ? (
+            <div className="flex flex-wrap gap-2">
+              {selectedPreferences.length > 0 ? selectedPreferences.map((pref) => (
+                <span key={pref} className="px-3 py-1.5 rounded-full text-xs font-medium bg-secondary/15 text-secondary border border-secondary/20">
+                  {pref}
+                </span>
+              )) : (
+                <p className="text-sm text-muted-foreground">No preferences set. Tap Edit to add.</p>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-wrap gap-2">
+                {PREFERENCE_OPTIONS.map((pref) => {
+                  const active = selectedPreferences.includes(pref);
+                  return (
+                    <motion.button
+                      key={pref}
+                      type="button"
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => togglePreference(pref)}
+                      className={`px-4 py-2 rounded-full text-xs font-medium font-body transition-all ${
+                        active
+                          ? "bg-secondary text-secondary-foreground shadow-elevated"
+                          : "bg-muted text-foreground hover:bg-accent"
+                      }`}
+                    >
+                      {pref}
+                    </motion.button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={handleSavePreferences}
+                disabled={saving}
+                className="w-full mt-4 rounded-full bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-60"
+              >
+                {saving ? "Saving..." : "Save Preferences"}
+              </button>
+            </>
+          )}
         </div>
 
-        {/* Menu */}
-        <div className="mt-8 space-y-2">
-          {menuItems.map(({ label, icon: Icon }) => (
+        {/* Menu Items */}
+        <div className="mt-6 space-y-2">
+          {[
+            { label: "Notifications", icon: Bell, dialog: "notifications" as DialogType },
+            { label: "Privacy & Security", icon: Shield, dialog: "privacy" as DialogType },
+            { label: "Help & Support", icon: HelpCircle, dialog: "help" as DialogType },
+          ].map(({ label, icon: Icon, dialog }) => (
             <button
               key={label}
-              className="w-full flex items-center justify-between bg-card p-4 rounded-2xl shadow-soft"
+              onClick={() => openDialog(dialog)}
+              className="w-full flex items-center justify-between bg-card p-4 rounded-2xl shadow-soft hover:bg-accent/50 transition"
             >
               <div className="flex items-center gap-3">
                 <Icon size={18} className="text-muted-foreground" />
@@ -193,15 +246,165 @@ const ProfilePage = () => {
 
         {/* Logout */}
         <motion.button
-          whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.96 }}
           onClick={handleLogout}
-          className="w-full mt-8 flex items-center justify-center gap-2 h-12 bg-orange-500 text-white rounded-full text-sm font-body font-semibold shadow-lg shadow-orange-500/20 transition duration-200 ease-out hover:bg-orange-600"
+          className="w-full mt-8 flex items-center justify-center gap-2 h-12 bg-primary text-primary-foreground rounded-full text-sm font-body font-semibold shadow-lg shadow-primary/20 transition hover:bg-primary/90"
         >
           <LogOut size={16} />
           Log Out
         </motion.button>
       </div>
+
+      {/* Dialog Overlay */}
+      <AnimatePresence>
+        {activeDialog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center"
+            onClick={() => setActiveDialog(null)}
+          >
+            <motion.div
+              initial={{ y: 100, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 100, opacity: 0 }}
+              transition={{ type: "spring", damping: 25 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-card w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 max-h-[85vh] overflow-y-auto shadow-elevated"
+            >
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-lg font-display font-semibold text-foreground">
+                  {activeDialog === "settings" && "Account Settings"}
+                  {activeDialog === "notifications" && "Notifications"}
+                  {activeDialog === "privacy" && "Privacy & Security"}
+                  {activeDialog === "help" && "Help & Support"}
+                </h2>
+                <button onClick={() => setActiveDialog(null)} className="p-1.5 rounded-full hover:bg-muted">
+                  <X size={20} className="text-muted-foreground" />
+                </button>
+              </div>
+
+              {settingsMsg && (
+                <Alert className="mb-4 border-secondary/30 bg-secondary/10 text-foreground">
+                  <AlertDescription>{settingsMsg}</AlertDescription>
+                </Alert>
+              )}
+
+              {/* Settings Dialog */}
+              {activeDialog === "settings" && (
+                <div className="space-y-6">
+                  <div>
+                    <label className="text-sm font-medium text-foreground flex items-center gap-2 mb-2">
+                      <User size={16} /> Display Name
+                    </label>
+                    <div className="flex gap-2">
+                      <Input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Your name" />
+                      <button
+                        onClick={handleUpdateName}
+                        disabled={settingsSaving}
+                        className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-60"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-border pt-4">
+                    <label className="text-sm font-medium text-foreground flex items-center gap-2 mb-3">
+                      <Lock size={16} /> Change Password
+                    </label>
+                    <div className="space-y-3">
+                      <Input
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="New password"
+                      />
+                      <Input
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Confirm new password"
+                      />
+                      <button
+                        onClick={handleUpdatePassword}
+                        disabled={settingsSaving}
+                        className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-60"
+                      >
+                        Update Password
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Notifications Dialog */}
+              {activeDialog === "notifications" && (
+                <div className="space-y-4">
+                  {[
+                    { label: "Push Notifications", desc: "Get notified about meal times and recommendations", icon: BellRing, value: pushEnabled, set: setPushEnabled },
+                    { label: "Email Notifications", desc: "Receive weekly meal plan summaries", icon: Mail, value: emailNotifs, set: setEmailNotifs },
+                    { label: "Meal Reminders", desc: "Reminders to plan your meals", icon: Volume2, value: mealReminders, set: setMealReminders },
+                  ].map(({ label, desc, icon: Icon, value, set }) => (
+                    <div key={label} className="flex items-center justify-between p-3 rounded-xl bg-muted/50">
+                      <div className="flex items-center gap-3">
+                        <Icon size={18} className="text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium text-foreground">{label}</p>
+                          <p className="text-xs text-muted-foreground">{desc}</p>
+                        </div>
+                      </div>
+                      <Switch checked={value} onCheckedChange={set} />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Privacy & Security Dialog */}
+              {activeDialog === "privacy" && (
+                <div className="space-y-4">
+                  {[
+                    { icon: Eye, title: "Data Visibility", desc: "Your profile and preferences are only visible to you." },
+                    { icon: Database, title: "Data Storage", desc: "Your data is securely stored and encrypted in our cloud." },
+                    { icon: Lock, title: "Account Security", desc: "Change your password anytime from Account Settings." },
+                    { icon: FileText, title: "Terms of Service", desc: "Read our terms and conditions for using SmartEats." },
+                    { icon: Shield, title: "Privacy Policy", desc: "Learn how we collect, use, and protect your information." },
+                  ].map(({ icon: Icon, title, desc }) => (
+                    <div key={title} className="flex gap-3 p-3 rounded-xl bg-muted/50">
+                      <Icon size={18} className="text-muted-foreground mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{title}</p>
+                        <p className="text-xs text-muted-foreground">{desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Help & Support Dialog */}
+              {activeDialog === "help" && (
+                <div className="space-y-4">
+                  {[
+                    { icon: BookOpen, title: "FAQs", desc: "Find answers to commonly asked questions about SmartEats." },
+                    { icon: MessageSquare, title: "Contact Support", desc: "Reach out to us via email at support@smarteats.app" },
+                    { icon: Phone, title: "Live Chat", desc: "Chat with our support team during business hours." },
+                    { icon: Info, title: "App Version", desc: "SmartEats v1.0.0" },
+                  ].map(({ icon: Icon, title, desc }) => (
+                    <div key={title} className="flex gap-3 p-3 rounded-xl bg-muted/50">
+                      <Icon size={18} className="text-muted-foreground mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{title}</p>
+                        <p className="text-xs text-muted-foreground">{desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
