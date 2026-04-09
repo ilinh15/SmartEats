@@ -1,6 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { onAuthStateChanged, getAuth } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
 import { useQuery } from "@tanstack/react-query";
 import CookingRecommendationSection from "@/components/CookingRecommendationSection";
 import HeroSection from "@/components/HeroSection";
@@ -10,7 +8,7 @@ import type { CookingRecommendation } from "@/lib/cookingRecommendations";
 import { getCurrentPosition, type GeolocationFailure } from "@/lib/geolocation";
 import { getMealTimeContent } from "@/lib/mealTime";
 import { searchMealRecommendations, searchNearbyPlaces, type NearbyPlace } from "@/lib/nearbyPlaces";
-import { auth, db } from "@/lib/firebase";
+import { supabase } from "@/integrations/supabase/client";
 
 interface HomePageProps {
   onNavigate: (tab: string) => void;
@@ -40,26 +38,17 @@ const HomePage = ({
   }, []);
 
   useEffect(() => {
-    if (!db) return;
-
-    const authClient = auth || getAuth();
-    const unsubscribe = onAuthStateChanged(authClient, async (user) => {
-      if (!user) return;
-
-      try {
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (userDoc.exists()) {
-          setUsername(userDoc.data()?.username || user.displayName || "Guest");
-        } else {
-          setUsername(user.displayName || "Guest");
-        }
-      } catch (error) {
-        console.error("Failed to load username:", error);
-        setUsername(user.displayName || "Guest");
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        const user = session.user;
+        const displayName = user.user_metadata?.display_name || user.email?.split("@")[0] || "Guest";
+        setUsername(displayName);
+      } else {
+        setUsername("Guest");
       }
     });
 
-    return unsubscribe;
+    return () => subscription.unsubscribe();
   }, []);
 
   const locationQuery = useQuery({

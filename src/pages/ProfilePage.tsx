@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { toast } from "sonner";
 
 const PREFERENCE_OPTIONS = [
   "Halal", "Economy", "Gluten-Free", "Vegan", "Vegetarian",
@@ -90,7 +91,7 @@ const ProfilePage = () => {
     }
     setSaving(false);
     setEditingPrefs(false);
-    setStatusMessage("Preferences updated!");
+    toast.success("Preferences saved successfully!");
   };
 
   const handleUpdateName = async () => {
@@ -101,14 +102,13 @@ const ProfilePage = () => {
       data: { display_name: editName.trim() },
     });
     if (error) {
-      setSettingsMsg("Failed to update name.");
+      toast.error("Failed to update name.");
     } else {
       setUsername(editName.trim());
-      // Also update profiles table
       if (userId) {
         await supabase.from("profiles").update({ display_name: editName.trim() }).eq("user_id", userId);
       }
-      setSettingsMsg("Name updated!");
+      toast.success("Name updated successfully!");
     }
     setSettingsSaving(false);
   };
@@ -126,9 +126,9 @@ const ProfilePage = () => {
     setSettingsSaving(true);
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) {
-      setSettingsMsg("Failed to update password.");
+      toast.error("Failed to update password.");
     } else {
-      setSettingsMsg("Password updated!");
+      toast.success("Password updated successfully!");
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
