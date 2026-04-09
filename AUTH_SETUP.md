@@ -1,7 +1,7 @@
 # 🔐 Authentication System Setup Guide
 
 ## Overview
-This guide covers the complete authentication flow for Tasteful Journeys:
+This guide covers the complete authentication flow for SmartEats:
 - **LoginPage** - User login with email/password
 - **RegisterPage** - New user registration 
 - **PreferencePage** - Food preference selection after registration
@@ -16,7 +16,7 @@ This guide covers the complete authentication flow for Tasteful Journeys:
 #### Step 1: Create Firebase Project
 1. Go to [Firebase Console](https://console.firebase.google.com)
 2. Click "Add project"
-3. Enter project name (e.g., "Tasteful Journeys")
+3. Enter project name (e.g., "SmartEats")
 4. Click through the setup wizard
 5. Wait for project creation
 

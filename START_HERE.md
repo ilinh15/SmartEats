@@ -156,7 +156,7 @@
 ### Login Page
 ```
 ┌─────────────────────────────┐
-│  Tasteful Journeys          │
+│  SmartEats                  │
 │  Welcome back!              │
 ├─────────────────────────────┤
 │                             │
@@ -174,7 +174,7 @@
 ### Register Page
 ```
 ┌─────────────────────────────┐
-│  Tasteful Journeys          │
+│  SmartEats                  │
 │  Create your account        │
 ├─────────────────────────────┤
 │                             │

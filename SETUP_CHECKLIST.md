@@ -5,7 +5,7 @@
 ### Step 1: Create Firebase Project
 - [ ] Go to https://console.firebase.google.com
 - [ ] Click "Add project"
-- [ ] Enter project name: `Tasteful Journeys` (or your choice)
+- [ ] Enter project name: `SmartEats` (or your choice)
 - [ ] Leave Google Analytics unchecked (optional)
 - [ ] Click "Create project"
 - [ ] Wait for project creation (takes ~1 min)
@@ -33,7 +33,7 @@
   - If it doesn't exist:
     - Click "Add app"
     - Select "Web"
-    - Enter app name: `Tasteful Journeys`
+    - Enter app name: `SmartEats`
     - Click "Register app"
 - [ ] Copy the entire config object shown
   - It looks like:

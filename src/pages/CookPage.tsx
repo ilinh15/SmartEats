@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChefHat, ChevronRight, Clock, Search, Star, Users, X } from "lucide-react";
+import { ChefHat, ChevronRight, Clock, AlertCircle, Search, Star, Users, X } from "lucide-react";
 import avocadoToast from "@/assets/recipe-avocado-toast.jpg";
 import { recipes as allRecipes } from "@/data/recipes";
+import { generateRecipeWithGemini, type GeneratedRecipe } from "@/lib/recipeGeneration";
+import { useToast } from "@/hooks/use-toast";
 
 const suggestedIngredients = [
   "Chicken",
@@ -24,6 +26,7 @@ const suggestedIngredients = [
 const cuisines = ["All", "Chinese", "Malay", "Western", "Japanese", "Indian", "Korean"];
 
 const CookPage = () => {
+  const { toast } = useToast();
   const [selected, setSelected] = useState<string[]>([]);
   const [ingredientInput, setIngredientInput] = useState("");
   const [showResult, setShowResult] = useState(false);
@@ -31,6 +34,8 @@ const CookPage = () => {
   const [search, setSearch] = useState("");
   const [expandedRecipe, setExpandedRecipe] = useState<string | null>(null);
   const [selectedCuisine, setSelectedCuisine] = useState("All");
+  const [generatedRecipe, setGeneratedRecipe] = useState<GeneratedRecipe | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const toggle = (item: string) => {
     setSelected((prev) =>
@@ -48,13 +53,26 @@ const CookPage = () => {
     setIngredientInput("");
   };
 
-  const generate = () => {
+  const generate = async () => {
     if (selected.length === 0) return;
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    setError(null);
+    try {
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      const recipe = await generateRecipeWithGemini(selected, selectedCuisine, apiKey);
+      setGeneratedRecipe(recipe);
       setShowResult(true);
-    }, 1500);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to generate recipe";
+      setError(errorMessage);
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filtered = useMemo(() => {
@@ -186,54 +204,87 @@ const CookPage = () => {
         </motion.button>
 
         <AnimatePresence>
-          {showResult && (
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="mt-6 p-4 bg-destructive/10 border border-destructive rounded-xl flex items-start gap-3"
+            >
+              <AlertCircle size={20} className="text-destructive flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-destructive">Error generating recipe</p>
+                <p className="text-sm text-destructive/80 mt-1">{error}</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showResult && generatedRecipe && (
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 30 }}
               className="mt-6 bg-card rounded-[24px] shadow-card overflow-hidden"
             >
-              <div className="aspect-video overflow-hidden">
-                <img src={avocadoToast} alt="Generated recipe" className="w-full h-full object-cover" />
+              <div className="aspect-video overflow-hidden bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
+                {generatedRecipe.imageUrl ? (
+                  <img
+                    src={generatedRecipe.imageUrl}
+                    alt={generatedRecipe.title}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="text-center">
+                    <ChefHat size={48} className="text-primary mx-auto mb-2 opacity-50" />
+                    <p className="text-sm text-muted-foreground font-body">Recipe Image</p>
+                  </div>
+                )}
               </div>
               <div className="p-5">
                 <h3 className="text-xl font-display font-semibold text-foreground">
-                  Creamy {selected[0]} and {selected[1] || "Herb"} Delight
+                  {generatedRecipe.title}
                 </h3>
-                <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground font-body">
+                <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground font-body flex-wrap">
                   <span className="flex items-center gap-1">
-                    <Clock size={14} /> 25 Min
+                    <Clock size={14} /> {generatedRecipe.prepTime}
                   </span>
                   <span className="flex items-center gap-1">
-                    <Users size={14} /> 2 Servings
+                    <Clock size={14} /> Cook: {generatedRecipe.cookTime}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Users size={14} /> {generatedRecipe.servings} Servings
                   </span>
                   <span className="px-2 py-0.5 bg-secondary/10 text-secondary rounded-md font-bold uppercase tracking-wider">
-                    Healthy
+                    {generatedRecipe.tag}
+                  </span>
+                  <span className="px-2 py-0.5 bg-accent text-accent-foreground rounded-md font-bold uppercase tracking-wider">
+                    {generatedRecipe.difficulty}
                   </span>
                 </div>
                 <div className="mt-4">
                   <h4 className="text-sm font-display font-semibold text-foreground mb-2">Ingredients</h4>
                   <ul className="space-y-1">
-                    {selected.map((item) => (
+                    {generatedRecipe.ingredients.map((item) => (
                       <li key={item} className="text-sm text-muted-foreground font-body flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
                         {item}
                       </li>
                     ))}
-                    <li className="text-sm text-muted-foreground font-body flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
-                      Olive oil, salt, pepper
-                    </li>
                   </ul>
                 </div>
                 <div className="mt-4">
                   <h4 className="text-sm font-display font-semibold text-foreground mb-2">Instructions</h4>
                   <ol className="space-y-2">
-                    <li className="text-sm text-muted-foreground font-body">1. Prep and dice all ingredients.</li>
-                    <li className="text-sm text-muted-foreground font-body">2. Heat olive oil in a large pan.</li>
-                    <li className="text-sm text-muted-foreground font-body">3. Saute aromatics until golden.</li>
-                    <li className="text-sm text-muted-foreground font-body">4. Add main ingredients and cook for 10 minutes.</li>
-                    <li className="text-sm text-muted-foreground font-body">5. Season and serve with fresh herbs.</li>
+                    {generatedRecipe.instructions.map((step, index) => (
+                      <li key={step} className="text-sm text-muted-foreground font-body flex gap-2">
+                        <span className="w-5 h-5 rounded-full bg-primary/10 text-primary flex-shrink-0 flex items-center justify-center text-[10px] font-bold mt-0.5">
+                          {index + 1}
+                        </span>
+                        <span>{step}</span>
+                      </li>
+                    ))}
                   </ol>
                 </div>
               </div>

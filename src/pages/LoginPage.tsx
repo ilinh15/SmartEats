@@ -68,7 +68,7 @@ const LoginPage = () => {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-display font-bold text-foreground mb-2">
-            Tasteful Journeys
+            SmartEats
           </h1>
           <p className="text-muted-foreground">Welcome back!</p>
         </div>

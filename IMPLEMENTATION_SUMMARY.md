@@ -2,7 +2,7 @@
 
 ## Summary
 
-Your **Tasteful Journeys** app now has a complete, production-ready authentication system with:
+Your **SmartEats** app now has a complete, production-ready authentication system with:
 - ✅ Email/Password authentication
 - ✅ User registration with validation
 - ✅ Food preference selection

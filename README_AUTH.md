@@ -1,4 +1,4 @@
-# 🔐 Tasteful Journeys - Authentication System
+# 🔐 SmartEats - Authentication System
 
 Complete, production-ready authentication system with Firebase + Firestore integration.
 
@@ -320,7 +320,7 @@ Pick a guide and get started:
 
 ## 📝 License
 
-Part of Tasteful Journeys project
+Part of SmartEats project
 
 ---
 

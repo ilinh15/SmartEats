@@ -2,7 +2,7 @@
 
 ## ✅ Complete Delivery Package
 
-Your Tasteful Journeys app now includes a **complete, production-ready authentication system**. Below is everything that was created and delivered.
+Your SmartEats app now includes a **complete, production-ready authentication system**. Below is everything that was created and delivered.
 
 ---
 
