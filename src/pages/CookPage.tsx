@@ -36,6 +36,7 @@ const CookPage = () => {
   const [selectedCuisine, setSelectedCuisine] = useState("All");
   const [generatedRecipe, setGeneratedRecipe] = useState<GeneratedRecipe | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const hasCookSessionState = selected.length > 0 || ingredientInput.trim().length > 0 || !!generatedRecipe || !!error;
 
   const toggle = (item: string) => {
     setSelected((prev) =>
@@ -51,6 +52,14 @@ const CookPage = () => {
       setShowResult(false);
     }
     setIngredientInput("");
+  };
+
+  const clearAll = () => {
+    setSelected([]);
+    setIngredientInput("");
+    setGeneratedRecipe(null);
+    setShowResult(false);
+    setError(null);
   };
 
   const generate = async () => {
@@ -121,22 +130,35 @@ const CookPage = () => {
           </button>
         </div>
 
-        <div className="flex flex-wrap gap-2 mt-5 min-h-[32px]">
-          <AnimatePresence>
-            {selected.map((item) => (
-              <motion.button
-                key={item}
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                exit={{ scale: 0 }}
-                onClick={() => toggle(item)}
-                className="flex items-center gap-1 px-3 py-1.5 bg-primary text-primary-foreground rounded-full text-xs font-medium font-body"
+        <div className="mt-5 min-h-[32px]">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-wrap gap-2 flex-1 min-w-0">
+              <AnimatePresence>
+                {selected.map((item) => (
+                  <motion.button
+                    key={item}
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    exit={{ scale: 0 }}
+                    onClick={() => toggle(item)}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-primary text-primary-foreground rounded-full text-xs font-medium font-body"
+                  >
+                    {item}
+                    <X size={12} />
+                  </motion.button>
+                ))}
+              </AnimatePresence>
+            </div>
+            {hasCookSessionState && (
+              <button
+                type="button"
+                onClick={clearAll}
+                className="px-3 py-1.5 rounded-full bg-card text-muted-foreground shadow-soft hover:text-foreground transition-colors text-xs font-medium font-body whitespace-nowrap"
               >
-                {item}
-                <X size={12} />
-              </motion.button>
-            ))}
-          </AnimatePresence>
+                Clear All
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="mt-4">
