@@ -1,4 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { onAuthStateChanged, getAuth } from "firebase/auth";
+import { getDoc, doc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
 import BottomNav from "@/components/BottomNav";
 import HomePage from "@/pages/HomePage";
 import CookPage from "@/pages/CookPage";
@@ -13,23 +17,54 @@ import { loadFavoriteRestaurants, saveFavoriteRestaurants } from "@/lib/restaura
 type Tab = "home" | "cook" | "nearby" | "favorites" | "profile";
 
 const Index = () => {
+  const navigate = useNavigate();
+  const authClient = auth || getAuth();
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>("home");
   const [favoriteRestaurants, setFavoriteRestaurants] = useState<NearbyPlace[]>(() => loadFavoriteRestaurants());
   const [favoriteRecipes, setFavoriteRecipes] = useState(() => loadFavoriteRecipes());
-
-  useEffect(() => {
-    saveFavoriteRestaurants(favoriteRestaurants);
-  }, [favoriteRestaurants]);
-
-  useEffect(() => {
-    saveFavoriteRecipes(favoriteRecipes);
-  }, [favoriteRecipes]);
-
   const favoriteRestaurantIds = useMemo(
     () => new Set(favoriteRestaurants.map((restaurant) => restaurant.id)),
     [favoriteRestaurants],
   );
-  const favoriteRecipeIds = useMemo(() => new Set(favoriteRecipes.map((recipe) => recipe.id)), [favoriteRecipes]);
+  const favoriteRecipeIds = useMemo(
+    () => new Set(favoriteRecipes.map((recipe) => recipe.id)),
+    [favoriteRecipes],
+  );
+
+  // Check authentication state and preference completion
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(authClient, (currentUser) => {
+      if (!currentUser) {
+        setLoading(false);
+        navigate("/login");
+        return;
+      }
+
+      setUser(currentUser);
+      setLoading(false);
+    });
+
+    return unsubscribe;
+  }, [authClient, navigate]);
+
+  // Show loading while checking auth
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-primary border-r-transparent mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If not authenticated, don't render anything (will redirect)
+  if (!user) {
+    return null;
+  }
 
   const handleNavigate = (tab: string) => {
     const validTabs: Tab[] = ["home", "cook", "nearby", "favorites", "profile"];

@@ -1,5 +1,5 @@
 import { initializeApp, type FirebaseApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, type Auth } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -17,11 +17,14 @@ export const isFirebaseConfigured = Object.values(firebaseConfig).every(
 
 let firebaseApp: FirebaseApp | null = null;
 let firestoreDb: Firestore | null = null;
+let firebaseAuth: Auth | null = null;
 
 if (isFirebaseConfigured) {
   firebaseApp = initializeApp(firebaseConfig);
+  firebaseAuth = getAuth(firebaseApp);
   firestoreDb = getFirestore(firebaseApp);
 }
 
 export const app = firebaseApp;
+export const auth = firebaseAuth;
 export const db = firestoreDb;

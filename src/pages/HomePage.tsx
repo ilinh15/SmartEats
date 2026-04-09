@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { onAuthStateChanged, getAuth } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
 import { useQuery } from "@tanstack/react-query";
 import CookingRecommendationSection from "@/components/CookingRecommendationSection";
 import HeroSection from "@/components/HeroSection";
@@ -8,6 +10,7 @@ import type { CookingRecommendation } from "@/lib/cookingRecommendations";
 import { getCurrentPosition, type GeolocationFailure } from "@/lib/geolocation";
 import { getMealTimeContent } from "@/lib/mealTime";
 import { searchMealRecommendations, searchNearbyPlaces, type NearbyPlace } from "@/lib/nearbyPlaces";
+import { auth, db } from "@/lib/firebase";
 
 interface HomePageProps {
   onNavigate: (tab: string) => void;
@@ -25,6 +28,7 @@ const HomePage = ({
   onToggleFavoriteRecipe,
 }: HomePageProps) => {
   const [currentTime, setCurrentTime] = useState(() => new Date());
+  const [username, setUsername] = useState("Guest");
   const mealContent = useMemo(() => getMealTimeContent(currentTime), [currentTime]);
 
   useEffect(() => {
@@ -33,6 +37,29 @@ const HomePage = ({
     }, 60_000);
 
     return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!db) return;
+
+    const authClient = auth || getAuth();
+    const unsubscribe = onAuthStateChanged(authClient, async (user) => {
+      if (!user) return;
+
+      try {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (userDoc.exists()) {
+          setUsername(userDoc.data()?.username || user.displayName || "Guest");
+        } else {
+          setUsername(user.displayName || "Guest");
+        }
+      } catch (error) {
+        console.error("Failed to load username:", error);
+        setUsername(user.displayName || "Guest");
+      }
+    });
+
+    return unsubscribe;
   }, []);
 
   const locationQuery = useQuery({
@@ -148,7 +175,7 @@ const HomePage = ({
 
   return (
     <div className="pb-20">
-      <HeroSection />
+      <HeroSection username={username} />
 
       <div className="px-5 mt-6">
         <QuickActions onAction={onNavigate} />

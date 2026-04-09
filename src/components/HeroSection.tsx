@@ -3,7 +3,11 @@ import { Search } from "lucide-react";
 import heroImg from "@/assets/hero-breakfast.jpg";
 import { getMealTimeContent } from "@/lib/mealTime";
 
-const HeroSection = () => {
+interface HeroSectionProps {
+  username?: string;
+}
+
+const HeroSection = ({ username = "Guest" }: HeroSectionProps) => {
   const { greeting, heroSuggestion } = getMealTimeContent();
 
   return (
@@ -19,7 +23,7 @@ const HeroSection = () => {
               animate={{ opacity: 1, y: 0 }}
               className="text-sm text-muted-foreground font-body"
             >
-              {greeting}, Alex
+              {greeting}, {username}
             </motion.p>
             <motion.h1
               initial={{ opacity: 0, y: 10 }}
