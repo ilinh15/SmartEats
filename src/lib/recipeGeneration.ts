@@ -60,44 +60,16 @@ export async function generateRecipeWithGemini(
     throw new Error("Gemini API key not configured. Please add VITE_GEMINI_API_KEY to .env.local");
   }
 
-  const cuisineText = cuisine !== "All" ? `${cuisine} cuisine` : "any cuisine";
-  const ingredientsList = ingredients.join(", ");
-
-  const prompt = `You are a professional chef. Generate a delicious recipe using these ingredients: ${ingredientsList}.
-The recipe should be ${cuisineText}.
-
-Return ONLY a valid JSON object (no markdown, no extra text) with this exact structure:
-{
-  "title": "Recipe name",
-  "prepTime": "15 Min",
-  "cookTime": "25 Min",
-  "servings": "2",
-  "difficulty": "Easy",
-  "tag": "Vegetarian",
-  "ingredients": ["ingredient 1", "ingredient 2"],
-  "instructions": ["Step 1", "Step 2"]
-}
-
-Requirements:
-- Use the provided ingredients in the recipe
-- Make it realistic and tasty
-- Keep instructions to 5-6 steps
-- Prep time and cook time format should be "X Min"
-- Difficulty should be Easy, Medium, or Hard
-- Generate 1-2 additional ingredients (like oil, salt, pepper) as needed`;
-
   try {
-    const response = await fetch(`https://gemini.googleapis.com/v1/models/gemini-1.5-mini:generate?key=${apiKey}`, {
+    // Call our dev-server API route to avoid browser CORS issues.
+    const response = await fetch("/api/generate-recipe", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        prompt: {
-          text: prompt,
-        },
-        temperature: 0.7,
-        maxOutputTokens: 1000,
+        ingredients,
+        cuisine,
       }),
     });
 
@@ -107,33 +79,18 @@ Requirements:
     }
 
     const data = await response.json();
-    const content =
-      data.candidates?.[0]?.output ||
-      (typeof data.candidates?.[0]?.content === "string"
-        ? data.candidates[0].content
-        : Array.isArray(data.candidates?.[0]?.content)
-        ? data.candidates[0].content.map((block: any) => block.text || "").join("")
-        : undefined);
-
-    if (!content) {
-      throw new Error("Gemini response did not contain text output.");
+    const recipe = data.recipe as GeneratedRecipe | undefined;
+    if (!recipe) {
+      throw new Error("Gemini response did not contain a recipe.");
     }
 
-    const jsonString = content.replace(/^```json\s*|\s*```$/g, "").trim();
-
-    try {
-      const recipe = JSON.parse(jsonString) as GeneratedRecipe;
-
-      // Fetch an image for the recipe
-      const imageUrl = await fetchRecipeImage(recipe.title);
-      if (imageUrl) {
-        recipe.imageUrl = imageUrl;
-      }
-
-      return recipe;
-    } catch {
-      throw new Error(`Failed to parse Gemini response as JSON: ${content}`);
+    // Fetch an image for the recipe
+    const imageUrl = await fetchRecipeImage(recipe.title);
+    if (imageUrl) {
+      recipe.imageUrl = imageUrl;
     }
+
+    return recipe;
   } catch (error) {
     if (error instanceof Error) {
       throw error;
