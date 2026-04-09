@@ -49,15 +49,19 @@ export async function fetchRecipeImage(recipeTitle: string): Promise<string | un
 }
 
 /**
- * Generate a recipe using Google Gemini based on selected ingredients and cuisine
+ * Generate a recipe using the local AI route with Gemini first and Mistral fallback.
  */
 export async function generateRecipeWithGemini(
   ingredients: string[],
   cuisine: string,
-  apiKey: string,
 ): Promise<GeneratedRecipe> {
-  if (!apiKey || apiKey === "your-gemini-api-key-here") {
-    throw new Error("Gemini API key not configured. Please add VITE_GEMINI_API_KEY to .env.local");
+  const hasGeminiKey =
+    !!import.meta.env.VITE_GEMINI_API_KEY && import.meta.env.VITE_GEMINI_API_KEY !== "your-gemini-api-key-here";
+  const hasMistralKey =
+    !!import.meta.env.VITE_MISTRAL_API_KEY && import.meta.env.VITE_MISTRAL_API_KEY !== "your-mistral-api-key-here";
+
+  if (!hasGeminiKey && !hasMistralKey) {
+    throw new Error("No AI provider configured. Please add VITE_GEMINI_API_KEY or VITE_MISTRAL_API_KEY to .env");
   }
 
   try {
@@ -81,7 +85,7 @@ export async function generateRecipeWithGemini(
     const data = await response.json();
     const recipe = data.recipe as GeneratedRecipe | undefined;
     if (!recipe) {
-      throw new Error("Gemini response did not contain a recipe.");
+      throw new Error("Recipe generation response did not contain a recipe.");
     }
 
     // Fetch an image for the recipe

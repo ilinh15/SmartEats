@@ -17,11 +17,11 @@ The cooking recommendation feature reads from a Firestore collection named `cook
 
 1. Create a Firebase project and add a web app.
 2. Enable Cloud Firestore.
-3. Add the Firebase web config values to `.env.local`.
+3. Add the Firebase web config values to `.env`.
 4. Create a `cooking_recommendations` collection in Firestore.
 5. Add recipe documents using the recipe slug as the document id, for example `tamago-sando`.
 
-Required `.env.local` variables:
+Required `.env` variables:
 
 ```bash
 VITE_FIREBASE_API_KEY=your_firebase_api_key
@@ -31,6 +31,17 @@ VITE_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
 VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
 VITE_FIREBASE_APP_ID=your_app_id
 ```
+
+Optional AI recipe generation variables in `.env`:
+
+```bash
+VITE_GEMINI_API_KEY=your_gemini_api_key
+VITE_GEMINI_MODEL=
+VITE_MISTRAL_API_KEY=your_mistral_api_key
+VITE_MISTRAL_MODEL=mistral-small-latest
+```
+
+The local recipe generator tries Gemini first and automatically falls back to Mistral if Gemini is unavailable or returns unusable output.
 
 Document shape for `cooking_recommendations`:
 

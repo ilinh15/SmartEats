@@ -58,8 +58,7 @@ const CookPage = () => {
     setLoading(true);
     setError(null);
     try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      const recipe = await generateRecipeWithGemini(selected, selectedCuisine, apiKey);
+      const recipe = await generateRecipeWithGemini(selected, selectedCuisine);
       setGeneratedRecipe(recipe);
       setShowResult(true);
     } catch (err) {
