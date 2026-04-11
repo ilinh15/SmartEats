@@ -232,6 +232,62 @@ const ProfilePage = () => {
           )}
         </div>
 
+        {/* Budget Preference */}
+        <div className="bg-card rounded-2xl p-4 shadow-soft mt-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-display font-semibold text-foreground flex items-center gap-2">
+              <DollarSign size={18} className="text-secondary" />
+              Budget Preference
+            </h2>
+            <button onClick={() => setEditingBudget(!editingBudget)} className="text-xs font-medium text-primary flex items-center gap-1">
+              <Pencil size={14} />
+              {editingBudget ? "Cancel" : "Edit"}
+            </button>
+          </div>
+
+          {!editingBudget ? (
+            <div className="flex flex-wrap gap-2">
+              {selectedBudget ? (
+                <span className="px-3 py-1.5 rounded-full text-xs font-medium bg-secondary/15 text-secondary border border-secondary/20">
+                  {selectedBudget}
+                </span>
+              ) : (
+                <p className="text-sm text-muted-foreground">No budget set. Tap Edit to add.</p>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-wrap gap-2">
+                {BUDGET_OPTIONS.map((budget) => {
+                  const active = selectedBudget === budget;
+                  return (
+                    <motion.button
+                      key={budget}
+                      type="button"
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setSelectedBudget(active ? "" : budget)}
+                      className={`px-4 py-2 rounded-full text-xs font-medium font-body transition-all ${
+                        active
+                          ? "bg-secondary text-secondary-foreground shadow-elevated"
+                          : "bg-muted text-foreground hover:bg-accent"
+                      }`}
+                    >
+                      {budget}
+                    </motion.button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={handleSavePreferences}
+                disabled={saving}
+                className="w-full mt-4 rounded-full bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-60"
+              >
+                {saving ? "Saving..." : "Save Budget"}
+              </button>
+            </>
+          )}
+        </div>
+
         {/* Menu Items */}
         <div className="mt-6 space-y-2">
           {[
