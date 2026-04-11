@@ -30,21 +30,27 @@ const Index = () => {
     [favoriteRecipes],
   );
 
-  // Check authentication state and preference completion
+  // Check authentication state
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(authClient, (currentUser) => {
-      if (!currentUser) {
-        setLoading(false);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
         navigate("/login");
-        return;
+      } else {
+        setUser(session.user);
       }
-
-      setUser(currentUser);
       setLoading(false);
     });
 
-    return unsubscribe;
-  }, [authClient, navigate]);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        navigate("/login");
+      } else {
+        setUser(session.user);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
 
   // Show loading while checking auth
   if (loading) {
