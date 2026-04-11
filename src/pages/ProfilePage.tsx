@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import {
   User, Leaf, LogOut, ChevronRight, Bell, Shield, HelpCircle,
   Settings, Pencil, X, Lock, Mail, MessageSquare, FileText, Eye, Database, Trash2,
-  Phone, Info, BookOpen, ExternalLink, BellRing, BellOff, Volume2
+  Phone, Info, BookOpen, ExternalLink, BellRing, BellOff, Volume2, DollarSign
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,6 +17,8 @@ const PREFERENCE_OPTIONS = [
   "Low Carb", "Dairy-Free", "Nut-Free", "Pescatarian", "Keto",
 ];
 
+const BUDGET_OPTIONS = ["Budget-friendly", "Moderate", "Premium"];
+
 type DialogType = "settings" | "notifications" | "privacy" | "help" | null;
 
 const ProfilePage = () => {
@@ -24,9 +26,11 @@ const ProfilePage = () => {
   const [username, setUsername] = useState("User");
   const [userId, setUserId] = useState<string | null>(null);
   const [selectedPreferences, setSelectedPreferences] = useState<string[]>([]);
+  const [selectedBudget, setSelectedBudget] = useState<string>("");
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [editingPrefs, setEditingPrefs] = useState(false);
+  const [editingBudget, setEditingBudget] = useState(false);
   const [activeDialog, setActiveDialog] = useState<DialogType>(null);
 
   // Settings state
@@ -62,7 +66,11 @@ const ProfilePage = () => {
           .from("user_dietary_preferences")
           .select("preference")
           .eq("user_id", user.id);
-        if (data) setSelectedPreferences(data.map((d) => d.preference));
+        if (data) {
+          const budgetPref = data.find((d) => BUDGET_OPTIONS.includes(d.preference));
+          if (budgetPref) setSelectedBudget(budgetPref.preference);
+          setSelectedPreferences(data.map((d) => d.preference).filter((p) => !BUDGET_OPTIONS.includes(p)));
+        }
       }
     });
     return () => subscription.unsubscribe();
@@ -82,15 +90,16 @@ const ProfilePage = () => {
   const handleSavePreferences = async () => {
     if (!userId) return;
     setSaving(true);
-    // Delete existing, then insert new
     await supabase.from("user_dietary_preferences").delete().eq("user_id", userId);
-    if (selectedPreferences.length > 0) {
+    const allPrefs = [...selectedPreferences, ...(selectedBudget ? [selectedBudget] : [])];
+    if (allPrefs.length > 0) {
       await supabase.from("user_dietary_preferences").insert(
-        selectedPreferences.map((p) => ({ user_id: userId, preference: p }))
+        allPrefs.map((p) => ({ user_id: userId, preference: p }))
       );
     }
     setSaving(false);
     setEditingPrefs(false);
+    setEditingBudget(false);
     toast.success("Preferences saved successfully!");
   };
 
@@ -218,6 +227,62 @@ const ProfilePage = () => {
                 className="w-full mt-4 rounded-full bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-60"
               >
                 {saving ? "Saving..." : "Save Preferences"}
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Budget Preference */}
+        <div className="bg-card rounded-2xl p-4 shadow-soft mt-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-display font-semibold text-foreground flex items-center gap-2">
+              <DollarSign size={18} className="text-secondary" />
+              Budget Preference
+            </h2>
+            <button onClick={() => setEditingBudget(!editingBudget)} className="text-xs font-medium text-primary flex items-center gap-1">
+              <Pencil size={14} />
+              {editingBudget ? "Cancel" : "Edit"}
+            </button>
+          </div>
+
+          {!editingBudget ? (
+            <div className="flex flex-wrap gap-2">
+              {selectedBudget ? (
+                <span className="px-3 py-1.5 rounded-full text-xs font-medium bg-secondary/15 text-secondary border border-secondary/20">
+                  {selectedBudget}
+                </span>
+              ) : (
+                <p className="text-sm text-muted-foreground">No budget set. Tap Edit to add.</p>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-wrap gap-2">
+                {BUDGET_OPTIONS.map((budget) => {
+                  const active = selectedBudget === budget;
+                  return (
+                    <motion.button
+                      key={budget}
+                      type="button"
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setSelectedBudget(active ? "" : budget)}
+                      className={`px-4 py-2 rounded-full text-xs font-medium font-body transition-all ${
+                        active
+                          ? "bg-secondary text-secondary-foreground shadow-elevated"
+                          : "bg-muted text-foreground hover:bg-accent"
+                      }`}
+                    >
+                      {budget}
+                    </motion.button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={handleSavePreferences}
+                disabled={saving}
+                className="w-full mt-4 rounded-full bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-60"
+              >
+                {saving ? "Saving..." : "Save Budget"}
               </button>
             </>
           )}
