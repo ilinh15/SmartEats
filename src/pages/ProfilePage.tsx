@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import {
   User, Leaf, LogOut, ChevronRight, Bell, Shield, HelpCircle,
   Settings, Pencil, X, Lock, Mail, MessageSquare, FileText, Eye, Database, Trash2,
-  Phone, Info, BookOpen, ExternalLink, BellRing, BellOff, Volume2
+  Phone, Info, BookOpen, ExternalLink, BellRing, BellOff, Volume2, DollarSign
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
