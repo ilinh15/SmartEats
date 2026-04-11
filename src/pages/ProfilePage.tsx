@@ -170,8 +170,11 @@ const ProfilePage = () => {
     <div className="pb-20 min-h-screen bg-background">
       {/* Header */}
       <div className="relative overflow-hidden rounded-b-[32px] px-5 pt-12 pb-8" style={{ background: "var(--hero-gradient)" }}>
-        <div className="absolute top-6 right-[-30px] w-40 h-40 rounded-full bg-primary/5 animate-pulse-soft" />
-        <div className="flex items-center gap-4">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute top-6 right-[-30px] h-40 w-40 rounded-full bg-primary/5 animate-pulse-soft"
+        />
+        <div className="relative z-10 flex items-center gap-4">
           <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center shadow-card">
             <User size={32} className="text-muted-foreground" />
           </div>
@@ -179,7 +182,12 @@ const ProfilePage = () => {
             <h1 className="text-xl font-display font-semibold text-foreground">{username}</h1>
             <p className="text-sm text-muted-foreground font-body">Home cook & foodie</p>
           </div>
-          <button onClick={() => openDialog("settings")} className="p-2 rounded-full bg-card/80 shadow-soft">
+          <button
+            type="button"
+            aria-label="Open account settings"
+            onClick={() => openDialog("settings")}
+            className="p-2 rounded-full bg-card/80 shadow-soft"
+          >
             <Settings size={20} className="text-muted-foreground" />
           </button>
         </div>
