@@ -66,7 +66,11 @@ const ProfilePage = () => {
           .from("user_dietary_preferences")
           .select("preference")
           .eq("user_id", user.id);
-        if (data) setSelectedPreferences(data.map((d) => d.preference));
+        if (data) {
+          const budgetPref = data.find((d) => BUDGET_OPTIONS.includes(d.preference));
+          if (budgetPref) setSelectedBudget(budgetPref.preference);
+          setSelectedPreferences(data.map((d) => d.preference).filter((p) => !BUDGET_OPTIONS.includes(p)));
+        }
       }
     });
     return () => subscription.unsubscribe();
