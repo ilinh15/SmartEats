@@ -146,6 +146,20 @@ const ProfilePage = () => {
     }
     setSettingsSaving(false);
   };
+  const handleUpdateEmail = async () => {
+    if (!editEmail.trim() || !editEmail.includes("@")) {
+      toast.error("Please enter a valid email address.");
+      return;
+    }
+    setSettingsSaving(true);
+    const { error } = await supabase.auth.updateUser({ email: editEmail.trim() });
+    if (error) {
+      toast.error(error.message || "Failed to update email.");
+    } else {
+      toast.success("Email update requested! Check your new email for a confirmation link.");
+    }
+    setSettingsSaving(false);
+  };
 
   const openDialog = (type: DialogType) => {
     setActiveDialog(type);
