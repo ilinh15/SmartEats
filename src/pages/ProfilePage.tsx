@@ -61,6 +61,7 @@ const ProfilePage = () => {
         const displayName = user.user_metadata?.display_name || user.email?.split("@")[0] || "User";
         setUsername(displayName);
         setEditName(displayName);
+        setEditEmail(user.email || "");
 
         // Load preferences
         const { data } = await supabase
