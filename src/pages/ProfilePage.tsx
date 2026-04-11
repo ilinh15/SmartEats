@@ -90,15 +90,16 @@ const ProfilePage = () => {
   const handleSavePreferences = async () => {
     if (!userId) return;
     setSaving(true);
-    // Delete existing, then insert new
     await supabase.from("user_dietary_preferences").delete().eq("user_id", userId);
-    if (selectedPreferences.length > 0) {
+    const allPrefs = [...selectedPreferences, ...(selectedBudget ? [selectedBudget] : [])];
+    if (allPrefs.length > 0) {
       await supabase.from("user_dietary_preferences").insert(
-        selectedPreferences.map((p) => ({ user_id: userId, preference: p }))
+        allPrefs.map((p) => ({ user_id: userId, preference: p }))
       );
     }
     setSaving(false);
     setEditingPrefs(false);
+    setEditingBudget(false);
     toast.success("Preferences saved successfully!");
   };
 
