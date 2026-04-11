@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { onAuthStateChanged, getAuth } from "firebase/auth";
-import { getDoc, doc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { supabase } from "@/integrations/supabase/client";
 import BottomNav from "@/components/BottomNav";
 import HomePage from "@/pages/HomePage";
 import CookPage from "@/pages/CookPage";
@@ -18,8 +16,7 @@ type Tab = "home" | "cook" | "nearby" | "favorites" | "profile";
 
 const Index = () => {
   const navigate = useNavigate();
-  const authClient = auth || getAuth();
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>("home");
   const [favoriteRestaurants, setFavoriteRestaurants] = useState<NearbyPlace[]>(() => loadFavoriteRestaurants());
