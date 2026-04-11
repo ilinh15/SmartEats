@@ -17,6 +17,8 @@ const PREFERENCE_OPTIONS = [
   "Low Carb", "Dairy-Free", "Nut-Free", "Pescatarian", "Keto",
 ];
 
+const BUDGET_OPTIONS = ["Budget-friendly", "Moderate", "Premium"];
+
 type DialogType = "settings" | "notifications" | "privacy" | "help" | null;
 
 const ProfilePage = () => {
