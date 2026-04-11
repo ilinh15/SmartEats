@@ -35,6 +35,7 @@ const ProfilePage = () => {
 
   // Settings state
   const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -60,6 +61,7 @@ const ProfilePage = () => {
         const displayName = user.user_metadata?.display_name || user.email?.split("@")[0] || "User";
         setUsername(displayName);
         setEditName(displayName);
+        setEditEmail(user.email || "");
 
         // Load preferences
         const { data } = await supabase
@@ -141,6 +143,20 @@ const ProfilePage = () => {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
+    }
+    setSettingsSaving(false);
+  };
+  const handleUpdateEmail = async () => {
+    if (!editEmail.trim() || !editEmail.includes("@")) {
+      toast.error("Please enter a valid email address.");
+      return;
+    }
+    setSettingsSaving(true);
+    const { error } = await supabase.auth.updateUser({ email: editEmail.trim() });
+    if (error) {
+      toast.error(error.message || "Failed to update email.");
+    } else {
+      toast.success("Email update requested! Check your new email for a confirmation link.");
     }
     setSettingsSaving(false);
   };
@@ -373,6 +389,23 @@ const ProfilePage = () => {
                         Save
                       </button>
                     </div>
+                  </div>
+
+                  <div className="border-t border-border pt-4">
+                    <label className="text-sm font-medium text-foreground flex items-center gap-2 mb-2">
+                      <Mail size={16} /> Email Address
+                    </label>
+                    <div className="flex gap-2">
+                      <Input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} placeholder="Your email" type="email" />
+                      <button
+                        onClick={handleUpdateEmail}
+                        disabled={settingsSaving}
+                        className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-60"
+                      >
+                        Save
+                      </button>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">A confirmation link will be sent to your new email.</p>
                   </div>
 
                   <div className="border-t border-border pt-4">
