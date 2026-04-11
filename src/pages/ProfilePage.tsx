@@ -26,9 +26,11 @@ const ProfilePage = () => {
   const [username, setUsername] = useState("User");
   const [userId, setUserId] = useState<string | null>(null);
   const [selectedPreferences, setSelectedPreferences] = useState<string[]>([]);
+  const [selectedBudget, setSelectedBudget] = useState<string>("");
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [editingPrefs, setEditingPrefs] = useState(false);
+  const [editingBudget, setEditingBudget] = useState(false);
   const [activeDialog, setActiveDialog] = useState<DialogType>(null);
 
   // Settings state
