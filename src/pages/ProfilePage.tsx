@@ -35,6 +35,7 @@ const ProfilePage = () => {
 
   // Settings state
   const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
