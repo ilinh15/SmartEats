@@ -114,4 +114,24 @@ describe("restaurant favorites flow", () => {
 
     expect(await screen.findByText(/your saved restaurants will appear here/i)).toBeInTheDocument();
   });
+
+  it("saves a restaurant from Nearby and keeps it in sync with Favorites", async () => {
+    renderIndex();
+
+    const navigation = await screen.findByRole("navigation");
+    fireEvent.click(within(navigation).getByRole("button", { name: /nearby/i }));
+
+    expect(await screen.findByText("Maxwell Food Centre")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /save maxwell food centre to favorites/i }));
+
+    fireEvent.click(within(navigation).getByRole("button", { name: /favorites/i }));
+    fireEvent.click(screen.getByRole("button", { name: /restaurants \(1\)/i }));
+
+    expect(await screen.findByText("Maxwell Food Centre")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /remove maxwell food centre from favorites/i }));
+
+    expect(await screen.findByText(/your saved restaurants will appear here/i)).toBeInTheDocument();
+  });
 });

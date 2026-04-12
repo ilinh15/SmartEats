@@ -4,17 +4,16 @@ import {
   COOKING_CUISINE_LABELS,
   COOKING_MEAL_LABELS,
   formatCookTimeMinutes,
-  type CookingRecommendation,
 } from "@/lib/cookingRecommendations";
 import { cn } from "@/lib/utils";
-import type { SavedRecipe } from "@/lib/recipeFavorites";
+import type { FavoriteRecipeInput } from "@/lib/recipeFavorites";
 
 interface CookingRecommendationCardProps {
-  recommendation: CookingRecommendation | SavedRecipe;
+  recommendation: FavoriteRecipeInput;
   className?: string;
   isFavorited?: boolean;
   onSelect?: () => void;
-  onToggleFavorite?: (recommendation: CookingRecommendation) => void;
+  onToggleFavorite?: (recommendation: FavoriteRecipeInput) => void;
 }
 
 const CookingRecommendationCard = ({
@@ -24,6 +23,33 @@ const CookingRecommendationCard = ({
   onSelect,
   onToggleFavorite,
 }: CookingRecommendationCardProps) => {
+  const cuisineLabel =
+    "cuisineLabel" in recommendation && recommendation.cuisineLabel
+      ? recommendation.cuisineLabel
+      : recommendation.cuisine
+        ? COOKING_CUISINE_LABELS[recommendation.cuisine]
+        : undefined;
+  const mealLabel =
+    "mealTypeLabel" in recommendation && recommendation.mealTypeLabel
+      ? recommendation.mealTypeLabel
+      : recommendation.mealType
+        ? COOKING_MEAL_LABELS[recommendation.mealType]
+        : undefined;
+  const cookTimeLabel =
+    "cookTimeLabel" in recommendation && recommendation.cookTimeLabel
+      ? recommendation.cookTimeLabel
+      : typeof recommendation.cookTimeMinutes === "number"
+        ? formatCookTimeMinutes(recommendation.cookTimeMinutes)
+        : undefined;
+  const cardTags = Array.from(
+    new Set(
+      [
+        ...(("tags" in recommendation && recommendation.tags) || []),
+        "tag" in recommendation ? recommendation.tag : undefined,
+      ].filter((tag): tag is string => typeof tag === "string" && tag.trim().length > 0),
+    ),
+  ).slice(0, 2);
+
   const handleKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
     if (!onSelect) {
       return;
@@ -91,16 +117,22 @@ const CookingRecommendationCard = ({
 
       <div className="p-4">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1 rounded-md bg-accent px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-accent-foreground">
-            <Clock size={10} />
-            {formatCookTimeMinutes(recommendation.cookTimeMinutes)}
-          </span>
-          <span className="rounded-md bg-secondary/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-secondary">
-            {COOKING_CUISINE_LABELS[recommendation.cuisine]}
-          </span>
-          <span className="rounded-md bg-primary/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">
-            {COOKING_MEAL_LABELS[recommendation.mealType]}
-          </span>
+          {cookTimeLabel && (
+            <span className="inline-flex items-center gap-1 rounded-md bg-accent px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-accent-foreground">
+              <Clock size={10} />
+              {cookTimeLabel}
+            </span>
+          )}
+          {cuisineLabel && (
+            <span className="rounded-md bg-secondary/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-secondary">
+              {cuisineLabel}
+            </span>
+          )}
+          {mealLabel && (
+            <span className="rounded-md bg-primary/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">
+              {mealLabel}
+            </span>
+          )}
         </div>
 
         <h3 className="mt-3 line-clamp-2 text-base font-display font-semibold text-foreground">
@@ -112,7 +144,7 @@ const CookingRecommendationCard = ({
 
         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-body text-muted-foreground">
           {recommendation.difficulty && <span>{recommendation.difficulty}</span>}
-          {recommendation.tags?.slice(0, 2).map((tag) => (
+          {cardTags.map((tag) => (
             <span key={tag} className="rounded-full bg-muted px-2.5 py-1">
               {tag}
             </span>

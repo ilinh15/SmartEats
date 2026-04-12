@@ -88,6 +88,68 @@ service cloud.firestore {
 }
 ```
 
+## Per-User Favorites Storage
+
+Restaurant and recipe favorites are stored per authenticated user in Firestore instead of browser `localStorage`.
+
+Collections:
+
+- `users/{uid}/favorite_restaurants/{restaurantId}`
+- `users/{uid}/favorite_recipes/{recipeId}`
+
+This covers favorites from:
+
+- Home restaurant cards
+- Nearby restaurant cards
+- Home cooking recommendation cards
+- Cook AI-generated recipe results
+
+Recommended fields for `favorite_restaurants`:
+
+```json
+{
+  "name": "Breakfast Corner",
+  "address": "Serangoon Road, Singapore",
+  "imageUrl": null,
+  "distanceText": "0.6 km",
+  "rating": 4.5,
+  "primaryType": "Cafe",
+  "mapsUrl": "https://maps.google.com/?cid=breakfast-corner",
+  "isOpenNow": true,
+  "savedAt": "2026-04-12T10:00:00.000Z"
+}
+```
+
+`favorite_recipes` stores the saved recipe snapshot fields from the app plus `savedAt`.
+
+For AI-generated Cook recipes, the app saves a deterministic snapshot document in `favorite_recipes` instead of creating a global recipe record. Firestore creates the subcollection automatically on first save, so you do not need to create it manually.
+
+Recommended rules for user-owned favorites:
+
+```txt
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+
+      match /favorite_restaurants/{restaurantId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+
+      match /favorite_recipes/{recipeId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+
+    match /cooking_recommendations/{document} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}
+```
+
 ## Verification
 
 ```bash

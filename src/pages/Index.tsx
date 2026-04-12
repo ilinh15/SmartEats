@@ -1,29 +1,35 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { onAuthStateChanged, getAuth } from "firebase/auth";
-import { getDoc, doc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { getAuth, onAuthStateChanged, type User } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 import BottomNav from "@/components/BottomNav";
+import { useToast } from "@/hooks/use-toast";
 import HomePage from "@/pages/HomePage";
 import CookPage from "@/pages/CookPage";
 import NearbyPage from "@/pages/NearbyPage";
 import FavoritesPage from "@/pages/FavoritesPage";
 import ProfilePage from "@/pages/ProfilePage";
-import type { CookingRecommendation } from "@/lib/cookingRecommendations";
 import type { NearbyPlace } from "@/lib/nearbyPlaces";
-import { loadFavoriteRecipes, saveFavoriteRecipes, toggleFavoriteRecipe } from "@/lib/recipeFavorites";
-import { loadFavoriteRestaurants, saveFavoriteRestaurants } from "@/lib/restaurantFavorites";
+import {
+  loadFavoriteRecipes,
+  toSavedRecipeSnapshot,
+  toggleFavoriteRecipe,
+  type FavoriteRecipeInput,
+  type SavedRecipe,
+} from "@/lib/recipeFavorites";
+import { loadFavoriteRestaurants, toggleFavoriteRestaurant } from "@/lib/restaurantFavorites";
 
 type Tab = "home" | "cook" | "nearby" | "favorites" | "profile";
 
 const Index = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const authClient = auth || getAuth();
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>("home");
-  const [favoriteRestaurants, setFavoriteRestaurants] = useState<NearbyPlace[]>(() => loadFavoriteRestaurants());
-  const [favoriteRecipes, setFavoriteRecipes] = useState(() => loadFavoriteRecipes());
+  const [favoriteRestaurants, setFavoriteRestaurants] = useState<NearbyPlace[]>([]);
+  const [favoriteRecipes, setFavoriteRecipes] = useState<SavedRecipe[]>([]);
   const favoriteRestaurantIds = useMemo(
     () => new Set(favoriteRestaurants.map((restaurant) => restaurant.id)),
     [favoriteRestaurants],
@@ -35,18 +41,57 @@ const Index = () => {
 
   // Check authentication state and preference completion
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(authClient, (currentUser) => {
+    let isActive = true;
+
+    const unsubscribe = onAuthStateChanged(authClient, async (currentUser) => {
+      if (!isActive) {
+        return;
+      }
+
       if (!currentUser) {
+        setUser(null);
+        setFavoriteRestaurants([]);
+        setFavoriteRecipes([]);
         setLoading(false);
         navigate("/login");
         return;
       }
 
+      setLoading(true);
       setUser(currentUser);
-      setLoading(false);
+
+      try {
+        const [loadedFavoriteRestaurants, loadedFavoriteRecipes] = await Promise.all([
+          loadFavoriteRestaurants(currentUser.uid),
+          loadFavoriteRecipes(currentUser.uid),
+        ]);
+
+        if (!isActive) {
+          return;
+        }
+
+        setFavoriteRestaurants(loadedFavoriteRestaurants);
+        setFavoriteRecipes(loadedFavoriteRecipes);
+      } catch (error) {
+        console.error("Failed to load user favorites:", error);
+
+        if (!isActive) {
+          return;
+        }
+
+        setFavoriteRestaurants([]);
+        setFavoriteRecipes([]);
+      } finally {
+        if (isActive) {
+          setLoading(false);
+        }
+      }
     });
 
-    return unsubscribe;
+    return () => {
+      isActive = false;
+      unsubscribe();
+    };
   }, [authClient, navigate]);
 
   // Show loading while checking auth
@@ -77,20 +122,76 @@ const Index = () => {
     }
   };
 
-  const handleToggleFavoriteRestaurant = (restaurant: NearbyPlace) => {
-    setFavoriteRestaurants((currentFavorites) => {
-      const isAlreadyFavorite = currentFavorites.some((favorite) => favorite.id === restaurant.id);
+  const handleToggleFavoriteRestaurant = async (restaurant: NearbyPlace) => {
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to save favorite restaurants.",
+        variant: "destructive",
+      });
+      navigate("/login");
+      return;
+    }
 
-      if (isAlreadyFavorite) {
-        return currentFavorites.filter((favorite) => favorite.id !== restaurant.id);
-      }
+    const currentFavorites = favoriteRestaurants;
+    const isAlreadyFavorite = currentFavorites.some((favorite) => favorite.id === restaurant.id);
+    const nextFavorites = isAlreadyFavorite
+      ? currentFavorites.filter((favorite) => favorite.id !== restaurant.id)
+      : [restaurant, ...currentFavorites];
 
-      return [restaurant, ...currentFavorites];
-    });
+    setFavoriteRestaurants(nextFavorites);
+
+    try {
+      await toggleFavoriteRestaurant(user.uid, restaurant);
+    } catch (error) {
+      console.error("Failed to update restaurant favorite:", error);
+      setFavoriteRestaurants(currentFavorites);
+      toast({
+        title: "Could not update favorite",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleToggleFavoriteRecipe = (recipe: CookingRecommendation) => {
-    setFavoriteRecipes((currentFavorites) => toggleFavoriteRecipe(currentFavorites, recipe));
+  const handleToggleFavoriteRecipe = async (recipe: FavoriteRecipeInput) => {
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to save favorite recipes.",
+        variant: "destructive",
+      });
+      navigate("/login");
+      return;
+    }
+
+    const recipeSnapshot = toSavedRecipeSnapshot(recipe);
+    const currentFavorites = favoriteRecipes;
+    const isAlreadyFavorite = currentFavorites.some((favorite) => favorite.id === recipeSnapshot.id);
+    const nextFavorites = isAlreadyFavorite
+      ? currentFavorites.filter((favorite) => favorite.id !== recipeSnapshot.id)
+      : [recipeSnapshot, ...currentFavorites];
+
+    setFavoriteRecipes(nextFavorites);
+
+    try {
+      const savedRecipe = await toggleFavoriteRecipe(user.uid, recipeSnapshot);
+
+      if (savedRecipe) {
+        setFavoriteRecipes((currentState) => [
+          savedRecipe,
+          ...currentState.filter((favorite) => favorite.id !== savedRecipe.id),
+        ]);
+      }
+    } catch (error) {
+      console.error("Failed to update recipe favorite:", error);
+      setFavoriteRecipes(currentFavorites);
+      toast({
+        title: "Could not update favorite",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -104,7 +205,12 @@ const Index = () => {
           onToggleFavoriteRecipe={handleToggleFavoriteRecipe}
         />
       )}
-      {activeTab === "cook" && <CookPage />}
+      {activeTab === "cook" && (
+        <CookPage
+          favoriteRecipeIds={favoriteRecipeIds}
+          onToggleFavoriteRecipe={handleToggleFavoriteRecipe}
+        />
+      )}
       {activeTab === "nearby" && (
         <NearbyPage
           favoriteRestaurantIds={favoriteRestaurantIds}

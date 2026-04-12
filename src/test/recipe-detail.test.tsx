@@ -1,6 +1,8 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import App from "@/App";
+import { createSavedRecipeFromGeneratedRecipe } from "@/lib/recipeFavorites";
+import { seedFirestoreDocument } from "./firebaseTestUtils";
 
 describe("recipe detail pages", () => {
   beforeEach(() => {
@@ -36,6 +38,39 @@ describe("recipe detail pages", () => {
     expect(screen.getByText("Japanese mayo")).toBeInTheDocument();
     expect(screen.getByText(/sandwich the egg filling between the bread/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /save tamago sando to favorites/i })).toBeInTheDocument();
+  });
+
+  it("renders a saved generated recipe from the user's favorites collection", async () => {
+    const savedGeneratedRecipe = createSavedRecipeFromGeneratedRecipe(
+      {
+        title: "Late Night Noodles",
+        prepTime: "5 Min",
+        cookTime: "12 Min",
+        servings: "1",
+        difficulty: "Easy",
+        tag: "Quick",
+        ingredients: ["Noodles", "Garlic", "Soy sauce"],
+        instructions: ["Boil the noodles.", "Toss with garlic and soy sauce."],
+        imageUrl: null,
+      },
+      {
+        selectedIngredients: ["Noodles", "Garlic", "Soy sauce"],
+        selectedCuisine: "Japanese",
+      },
+    );
+
+    seedFirestoreDocument(`users/test-user/favorite_recipes/${savedGeneratedRecipe.id}`, savedGeneratedRecipe);
+    window.history.pushState({}, "", `/recipes/${savedGeneratedRecipe.id}`);
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: /late night noodles/i })).toBeInTheDocument();
+    expect(screen.getByText(/ai-generated japanese recipe/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Prep Time$/i)).toBeInTheDocument();
+    expect(screen.getByText("12 Min")).toBeInTheDocument();
+    expect(screen.getByText("Soy sauce")).toBeInTheDocument();
+    expect(screen.getByText(/toss with garlic and soy sauce/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /remove late night noodles from favorites/i })).toBeInTheDocument();
   });
 
   it("shows the not found page for an invalid recipe id", async () => {

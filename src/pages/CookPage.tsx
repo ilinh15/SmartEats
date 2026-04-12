@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChefHat, ChevronRight, Clock, AlertCircle, Search, Star, Users, X } from "lucide-react";
-import avocadoToast from "@/assets/recipe-avocado-toast.jpg";
+import { AlertCircle, ChefHat, ChevronRight, Clock, Heart, Search, Star, Users, X } from "lucide-react";
 import { recipes as allRecipes } from "@/data/recipes";
 import { generateRecipeWithGemini, type GeneratedRecipe } from "@/lib/recipeGeneration";
+import { createSavedRecipeFromGeneratedRecipe, type FavoriteRecipeInput } from "@/lib/recipeFavorites";
 import { useToast } from "@/hooks/use-toast";
 
 const suggestedIngredients = [
@@ -24,8 +24,17 @@ const suggestedIngredients = [
 ];
 
 const cuisines = ["All", "Chinese", "Malay", "Western", "Japanese", "Indian", "Korean"];
+const EMPTY_FAVORITE_RECIPE_IDS = new Set<string>();
 
-const CookPage = () => {
+interface CookPageProps {
+  favoriteRecipeIds?: ReadonlySet<string>;
+  onToggleFavoriteRecipe?: (recipe: FavoriteRecipeInput) => void;
+}
+
+const CookPage = ({
+  favoriteRecipeIds = EMPTY_FAVORITE_RECIPE_IDS,
+  onToggleFavoriteRecipe,
+}: CookPageProps) => {
   const { toast } = useToast();
   const [selected, setSelected] = useState<string[]>([]);
   const [ingredientInput, setIngredientInput] = useState("");
@@ -37,6 +46,19 @@ const CookPage = () => {
   const [generatedRecipe, setGeneratedRecipe] = useState<GeneratedRecipe | null>(null);
   const [error, setError] = useState<string | null>(null);
   const hasCookSessionState = selected.length > 0 || ingredientInput.trim().length > 0 || !!generatedRecipe || !!error;
+  const generatedFavoriteRecipe = useMemo(
+    () =>
+      generatedRecipe
+        ? createSavedRecipeFromGeneratedRecipe(generatedRecipe, {
+            selectedIngredients: selected,
+            selectedCuisine,
+          })
+        : null,
+    [generatedRecipe, selected, selectedCuisine],
+  );
+  const isGeneratedRecipeFavorited = generatedFavoriteRecipe
+    ? favoriteRecipeIds.has(generatedFavoriteRecipe.id)
+    : false;
 
   const toggle = (item: string) => {
     setSelected((prev) =>
@@ -264,9 +286,29 @@ const CookPage = () => {
                 )}
               </div>
               <div className="p-5">
-                <h3 className="text-xl font-display font-semibold text-foreground">
-                  {generatedRecipe.title}
-                </h3>
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="text-xl font-display font-semibold text-foreground">
+                    {generatedRecipe.title}
+                  </h3>
+                  {generatedFavoriteRecipe && onToggleFavoriteRecipe && (
+                    <button
+                      type="button"
+                      onClick={() => onToggleFavoriteRecipe(generatedFavoriteRecipe)}
+                      aria-label={
+                        isGeneratedRecipeFavorited
+                          ? `Remove ${generatedRecipe.title} from favorites`
+                          : `Save ${generatedRecipe.title} to favorites`
+                      }
+                      className={`inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border transition-colors ${
+                        isGeneratedRecipeFavorited
+                          ? "border-primary bg-primary text-primary-foreground shadow-soft"
+                          : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-primary"
+                      }`}
+                    >
+                      <Heart size={18} fill={isGeneratedRecipeFavorited ? "currentColor" : "none"} />
+                    </button>
+                  )}
+                </div>
                 <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground font-body flex-wrap">
                   <span className="flex items-center gap-1">
                     <Clock size={14} /> {generatedRecipe.prepTime}

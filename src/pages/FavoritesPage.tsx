@@ -4,9 +4,8 @@ import { CalendarDays, Heart, Plus, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import CookingRecommendationCard from "@/components/CookingRecommendationCard";
 import RestaurantCard from "@/components/RestaurantCard";
-import type { CookingRecommendation } from "@/lib/cookingRecommendations";
 import type { NearbyPlace } from "@/lib/nearbyPlaces";
-import type { SavedRecipe } from "@/lib/recipeFavorites";
+import type { FavoriteRecipeInput, SavedRecipe } from "@/lib/recipeFavorites";
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -29,7 +28,7 @@ const initialMeals: WeekMeals = {
 interface FavoritesPageProps {
   favoriteRecipes: SavedRecipe[];
   favoriteRestaurants: NearbyPlace[];
-  onToggleFavoriteRecipe: (recipe: CookingRecommendation) => void;
+  onToggleFavoriteRecipe: (recipe: FavoriteRecipeInput) => void;
   onToggleFavoriteRestaurant: (restaurant: NearbyPlace) => void;
 }
 
@@ -114,7 +113,7 @@ const FavoritesPage = ({
               </div>
             ) : (
               <div className="flex flex-col items-center py-12">
-                <p className="text-muted-foreground font-body text-sm">Save recipes from Home to see them here</p>
+                <p className="text-muted-foreground font-body text-sm">Save recipes from Home or Cook to see them here</p>
               </div>
             )
           )}

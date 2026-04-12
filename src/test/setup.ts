@@ -1,4 +1,11 @@
 import "@testing-library/jest-dom";
+import { afterEach, vi } from "vitest";
+import {
+  firebaseAuthModuleMock,
+  firebaseFirestoreModuleMock,
+  firebaseModuleMock,
+  resetFirebaseTestState,
+} from "./firebaseTestUtils";
 
 Object.defineProperty(window, "matchMedia", {
   writable: true,
@@ -12,4 +19,12 @@ Object.defineProperty(window, "matchMedia", {
     removeEventListener: () => {},
     dispatchEvent: () => {},
   }),
+});
+
+vi.mock("@/lib/firebase", () => firebaseModuleMock);
+vi.mock("firebase/auth", () => firebaseAuthModuleMock);
+vi.mock("firebase/firestore", () => firebaseFirestoreModuleMock);
+
+afterEach(() => {
+  resetFirebaseTestState();
 });

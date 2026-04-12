@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import CookPage from "@/pages/CookPage";
 
@@ -21,7 +21,7 @@ describe("CookPage clear all", () => {
     mockGenerateRecipeWithGemini.mockReset();
   });
 
-  it("clears selected ingredients and typed input without changing search", () => {
+  it("clears selected ingredients and typed input without changing search", async () => {
     render(<CookPage />);
 
     fireEvent.click(screen.getByRole("button", { name: "Chicken" }));
@@ -35,8 +35,10 @@ describe("CookPage clear all", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /clear all/i }));
 
-    expect(screen.queryByText("Chicken")).not.toBeInTheDocument();
-    expect(screen.queryByText("Pasta")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getAllByText("Chicken")).toHaveLength(1);
+      expect(screen.getAllByText("Pasta")).toHaveLength(1);
+    });
     expect(screen.getByPlaceholderText(/type an ingredient and press enter/i)).toHaveValue("");
     expect(screen.getByPlaceholderText(/search food, recipes, ingredients/i)).toHaveValue("salad");
     expect(screen.queryByRole("button", { name: /clear all/i })).not.toBeInTheDocument();
@@ -63,7 +65,9 @@ describe("CookPage clear all", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /clear all/i }));
 
-    expect(screen.queryByRole("heading", { name: "Test Curry" })).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole("heading", { name: "Test Curry" })).not.toBeInTheDocument();
+    });
     expect(screen.queryByText(/error generating recipe/i)).not.toBeInTheDocument();
   });
 });

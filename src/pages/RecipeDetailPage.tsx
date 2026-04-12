@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ChefHat, Clock, Heart, ImageOff, Star, Users, UtensilsCrossed } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
+import { getAuth, onAuthStateChanged, type User } from "firebase/auth";
+import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getRecipeById } from "@/data/recipes";
 import {
@@ -9,9 +11,14 @@ import {
   COOKING_MEAL_LABELS,
   formatCookTimeMinutes,
   getCookingRecommendationById,
-  type CookingRecommendation,
 } from "@/lib/cookingRecommendations";
-import { loadFavoriteRecipes, saveFavoriteRecipes, toggleFavoriteRecipe } from "@/lib/recipeFavorites";
+import { auth } from "@/lib/firebase";
+import {
+  loadFavoriteRecipes,
+  toSavedRecipeSnapshot,
+  toggleFavoriteRecipe,
+  type SavedRecipe,
+} from "@/lib/recipeFavorites";
 import NotFound from "./NotFound";
 
 const RecommendationDetailSkeleton = () => (
@@ -52,8 +59,15 @@ const RecommendationDetailSkeleton = () => (
 
 const RecipeDetailPage = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const { recipeId } = useParams<{ recipeId: string }>();
-  const [favoriteRecipes, setFavoriteRecipes] = useState(() => loadFavoriteRecipes());
+  const authClient = auth || getAuth();
+  const [currentUser, setCurrentUser] = useState<User | null>(authClient.currentUser);
+  const [favoriteRecipes, setFavoriteRecipes] = useState<SavedRecipe[]>([]);
+  const [resolvedSavedRecipe, setResolvedSavedRecipe] = useState<SavedRecipe | null>(null);
+  const [isAuthResolved, setIsAuthResolved] = useState(false);
+  const [isFavoriteSyncing, setIsFavoriteSyncing] = useState(true);
+  const [isFavoriteUpdating, setIsFavoriteUpdating] = useState(false);
 
   const legacyRecipe = recipeId ? getRecipeById(recipeId) : undefined;
   const recommendationQuery = useQuery({
@@ -64,16 +78,87 @@ const RecipeDetailPage = () => {
   });
 
   const recommendation = legacyRecipe ? undefined : recommendationQuery.data;
+  const recommendationSnapshot = useMemo(
+    () => (recommendation ? toSavedRecipeSnapshot(recommendation) : null),
+    [recommendation],
+  );
+
+  useEffect(() => {
+    let isActive = true;
+
+    const unsubscribe = onAuthStateChanged(authClient, async (user) => {
+      if (!isActive) {
+        return;
+      }
+
+      setCurrentUser(user);
+      setIsAuthResolved(true);
+
+      if (!user) {
+        setFavoriteRecipes([]);
+        setIsFavoriteSyncing(false);
+        return;
+      }
+
+      setIsFavoriteSyncing(true);
+
+      try {
+        const loadedFavoriteRecipes = await loadFavoriteRecipes(user.uid);
+
+        if (!isActive) {
+          return;
+        }
+
+        setFavoriteRecipes(loadedFavoriteRecipes);
+      } catch (error) {
+        console.error("Failed to load recipe favorites:", error);
+
+        if (!isActive) {
+          return;
+        }
+
+        setFavoriteRecipes([]);
+      } finally {
+        if (isActive) {
+          setIsFavoriteSyncing(false);
+        }
+      }
+    });
+
+    return () => {
+      isActive = false;
+      unsubscribe();
+    };
+  }, [authClient]);
+
+  useEffect(() => {
+    setResolvedSavedRecipe(null);
+  }, [recipeId]);
+
+  useEffect(() => {
+    if (!recipeId) {
+      return;
+    }
+
+    const matchedFavorite = favoriteRecipes.find((favorite) => favorite.id === recipeId);
+
+    if (matchedFavorite) {
+      setResolvedSavedRecipe(matchedFavorite);
+    }
+  }, [favoriteRecipes, recipeId]);
+
+  const favoriteRecipe = recommendationSnapshot ? null : resolvedSavedRecipe;
+  const shouldWaitForFavoriteFallback = !recommendationSnapshot && !!currentUser && isFavoriteSyncing;
 
   if (!recipeId) {
     return <NotFound />;
   }
 
-  if (!legacyRecipe && recommendationQuery.isLoading) {
+  if (!legacyRecipe && (recommendationQuery.isLoading || !isAuthResolved || shouldWaitForFavoriteFallback)) {
     return <RecommendationDetailSkeleton />;
   }
 
-  if (!legacyRecipe && !recommendation) {
+  if (!legacyRecipe && !recommendationSnapshot && !favoriteRecipe) {
     return <NotFound />;
   }
 
@@ -87,15 +172,56 @@ const RecipeDetailPage = () => {
   };
 
   const handleToggleFavorite = () => {
-    if (!recommendation) {
+    const detailRecipe = recommendationSnapshot ?? favoriteRecipe;
+
+    if (!detailRecipe) {
       return;
     }
 
-    setFavoriteRecipes((currentFavorites) => {
-      const updatedFavorites = toggleFavoriteRecipe(currentFavorites, recommendation);
-      saveFavoriteRecipes(updatedFavorites);
-      return updatedFavorites;
-    });
+    if (!currentUser) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to save favorite recipes.",
+        variant: "destructive",
+      });
+      navigate("/login");
+      return;
+    }
+
+    if (isFavoriteUpdating) {
+      return;
+    }
+
+    const currentFavorites = favoriteRecipes;
+    const isAlreadyFavorite = currentFavorites.some((favorite) => favorite.id === detailRecipe.id);
+    const nextFavorites = isAlreadyFavorite
+      ? currentFavorites.filter((favorite) => favorite.id !== detailRecipe.id)
+      : [detailRecipe, ...currentFavorites];
+
+    setFavoriteRecipes(nextFavorites);
+    setIsFavoriteUpdating(true);
+
+    void toggleFavoriteRecipe(currentUser.uid, detailRecipe)
+      .then((savedRecipe) => {
+        if (savedRecipe) {
+          setFavoriteRecipes((currentState) => [
+            savedRecipe,
+            ...currentState.filter((favorite) => favorite.id !== savedRecipe.id),
+          ]);
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to update recipe favorite:", error);
+        setFavoriteRecipes(currentFavorites);
+        toast({
+          title: "Could not update favorite",
+          description: error instanceof Error ? error.message : "Please try again.",
+          variant: "destructive",
+        });
+      })
+      .finally(() => {
+        setIsFavoriteUpdating(false);
+      });
   };
 
   const renderImage = (imageUrl: string | null | undefined, title: string) => {
@@ -111,20 +237,91 @@ const RecipeDetailPage = () => {
     );
   };
 
-  const renderDetailBody = (currentRecommendation: CookingRecommendation) => {
-    const isFavorited = favoriteRecipes.some((favorite) => favorite.id === currentRecommendation.id);
+  const renderDetailBody = (currentRecipe: SavedRecipe) => {
+    const isFavorited = favoriteRecipes.some((favorite) => favorite.id === currentRecipe.id);
+    const favoriteButtonDisabled = isFavoriteSyncing || isFavoriteUpdating;
+    const cuisineLabel = currentRecipe.cuisineLabel ?? (currentRecipe.cuisine ? COOKING_CUISINE_LABELS[currentRecipe.cuisine] : undefined);
+    const mealLabel = currentRecipe.mealTypeLabel ?? (currentRecipe.mealType ? COOKING_MEAL_LABELS[currentRecipe.mealType] : undefined);
+    const cookTimeLabel =
+      currentRecipe.cookTimeLabel ??
+      (typeof currentRecipe.cookTimeMinutes === "number" ? formatCookTimeMinutes(currentRecipe.cookTimeMinutes) : undefined);
+    const displayTags = Array.from(
+      new Set(
+        [...(currentRecipe.tags ?? []), currentRecipe.tag].filter(
+          (tag): tag is string => typeof tag === "string" && tag.trim().length > 0,
+        ),
+      ),
+    );
+    const detailItems = [
+      cookTimeLabel
+        ? {
+            icon: <Clock size={16} className="text-primary" />,
+            label: "Cook Time",
+            value: cookTimeLabel,
+          }
+        : null,
+      currentRecipe.prepTimeLabel
+        ? {
+            icon: <Clock size={16} className="text-primary" />,
+            label: "Prep Time",
+            value: currentRecipe.prepTimeLabel,
+          }
+        : null,
+      currentRecipe.servings
+        ? {
+            icon: <Users size={16} className="text-primary" />,
+            label: "Servings",
+            value: currentRecipe.servings,
+          }
+        : null,
+      mealLabel
+        ? {
+            icon: <UtensilsCrossed size={16} className="text-primary" />,
+            label: "Meal Type",
+            value: mealLabel,
+          }
+        : null,
+      cuisineLabel
+        ? {
+            icon: <ChefHat size={16} className="text-primary" />,
+            label: "Cuisine",
+            value: cuisineLabel,
+          }
+        : null,
+      currentRecipe.difficulty
+        ? {
+            icon: <Star size={16} className="text-primary" />,
+            label: "Difficulty",
+            value: currentRecipe.difficulty,
+          }
+        : null,
+    ].filter(
+      (
+        item,
+      ): item is {
+        icon: JSX.Element;
+        label: string;
+        value: string;
+      } => item !== null,
+    );
 
     return (
       <>
         <div className="flex items-start justify-between gap-4">
           <div className="flex flex-wrap gap-2">
-            <span className="inline-flex rounded-full bg-secondary/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-secondary">
-              {COOKING_CUISINE_LABELS[currentRecommendation.cuisine]}
-            </span>
-            <span className="inline-flex rounded-full bg-primary/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">
-              {COOKING_MEAL_LABELS[currentRecommendation.mealType]}
-            </span>
-            {currentRecommendation.tags?.slice(0, 1).map((tag) => (
+            {cuisineLabel && (
+              <span
+                className="inline-flex rounded-full bg-secondary/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-secondary"
+              >
+                {cuisineLabel}
+              </span>
+            )}
+            {mealLabel && (
+              <span className="inline-flex rounded-full bg-primary/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">
+                {mealLabel}
+              </span>
+            )}
+            {displayTags.slice(0, 1).map((tag) => (
               <span
                 key={tag}
                 className="inline-flex rounded-full bg-accent px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-accent-foreground"
@@ -137,67 +334,43 @@ const RecipeDetailPage = () => {
           <button
             type="button"
             onClick={handleToggleFavorite}
+            disabled={favoriteButtonDisabled}
             aria-label={
               isFavorited
-                ? `Remove ${currentRecommendation.title} from favorites`
-                : `Save ${currentRecommendation.title} to favorites`
+                ? `Remove ${currentRecipe.title} from favorites`
+                : `Save ${currentRecipe.title} to favorites`
             }
             className={`inline-flex h-11 w-11 items-center justify-center rounded-full border transition-colors ${
               isFavorited
                 ? "border-primary bg-primary text-primary-foreground shadow-soft"
                 : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-primary"
-            }`}
+            } ${favoriteButtonDisabled ? "cursor-not-allowed opacity-70" : ""}`}
           >
             <Heart size={18} fill={isFavorited ? "currentColor" : "none"} />
           </button>
         </div>
 
-        <h1 className="text-3xl font-display font-semibold text-foreground mt-3">{currentRecommendation.title}</h1>
-        <p className="text-sm font-body text-muted-foreground mt-2">{currentRecommendation.description}</p>
+        <h1 className="text-3xl font-display font-semibold text-foreground mt-3">{currentRecipe.title}</h1>
+        <p className="text-sm font-body text-muted-foreground mt-2">{currentRecipe.description}</p>
 
-        <div className="grid grid-cols-2 gap-3 mt-6">
-          <div className="bg-card rounded-2xl p-4 shadow-soft">
-            <span className="flex items-center gap-2 text-sm text-muted-foreground font-body">
-              <Clock size={16} className="text-primary" />
-              Cook Time
-            </span>
-            <p className="text-lg font-display font-semibold text-foreground mt-2">
-              {formatCookTimeMinutes(currentRecommendation.cookTimeMinutes)}
-            </p>
+        {detailItems.length > 0 && (
+          <div className="grid grid-cols-2 gap-3 mt-6">
+            {detailItems.map((item) => (
+              <div key={item.label} className="bg-card rounded-2xl p-4 shadow-soft">
+                <span className="flex items-center gap-2 text-sm text-muted-foreground font-body">
+                  {item.icon}
+                  {item.label}
+                </span>
+                <p className="text-lg font-display font-semibold text-foreground mt-2">{item.value}</p>
+              </div>
+            ))}
           </div>
-          <div className="bg-card rounded-2xl p-4 shadow-soft">
-            <span className="flex items-center gap-2 text-sm text-muted-foreground font-body">
-              <UtensilsCrossed size={16} className="text-primary" />
-              Meal Type
-            </span>
-            <p className="text-lg font-display font-semibold text-foreground mt-2">
-              {COOKING_MEAL_LABELS[currentRecommendation.mealType]}
-            </p>
-          </div>
-          <div className="bg-card rounded-2xl p-4 shadow-soft">
-            <span className="flex items-center gap-2 text-sm text-muted-foreground font-body">
-              <ChefHat size={16} className="text-primary" />
-              Cuisine
-            </span>
-            <p className="text-lg font-display font-semibold text-foreground mt-2">
-              {COOKING_CUISINE_LABELS[currentRecommendation.cuisine]}
-            </p>
-          </div>
-          <div className="bg-card rounded-2xl p-4 shadow-soft">
-            <span className="flex items-center gap-2 text-sm text-muted-foreground font-body">
-              <Star size={16} className="text-primary" />
-              Difficulty
-            </span>
-            <p className="text-lg font-display font-semibold text-foreground mt-2">
-              {currentRecommendation.difficulty ?? "Easy"}
-            </p>
-          </div>
-        </div>
+        )}
 
         <div className="bg-card rounded-[24px] shadow-card p-5 mt-6">
           <h2 className="text-lg font-display font-semibold text-foreground">Ingredients</h2>
           <ul className="space-y-3 mt-4">
-            {currentRecommendation.ingredients.map((ingredient) => (
+            {currentRecipe.ingredients.map((ingredient) => (
               <li key={ingredient} className="flex items-center gap-3 text-sm font-body text-muted-foreground">
                 <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
                 {ingredient}
@@ -209,7 +382,7 @@ const RecipeDetailPage = () => {
         <div className="bg-card rounded-[24px] shadow-card p-5 mt-4">
           <h2 className="text-lg font-display font-semibold text-foreground">Instructions</h2>
           <ol className="space-y-4 mt-4">
-            {currentRecommendation.instructions.map((step, index) => (
+            {currentRecipe.instructions.map((step, index) => (
               <li key={step} className="flex gap-3 text-sm font-body text-muted-foreground">
                 <span className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold flex-shrink-0">
                   {index + 1}
@@ -237,7 +410,9 @@ const RecipeDetailPage = () => {
             </button>
 
             <div className="mt-5 rounded-[28px] overflow-hidden shadow-card">
-              {legacyRecipe ? renderImage(legacyRecipe.image, legacyRecipe.title) : renderImage(recommendation?.imageUrl, recommendation!.title)}
+              {legacyRecipe
+                ? renderImage(legacyRecipe.image, legacyRecipe.title)
+                : renderImage((recommendationSnapshot ?? favoriteRecipe)?.imageUrl, (recommendationSnapshot ?? favoriteRecipe)!.title)}
             </div>
           </div>
         </div>
@@ -314,7 +489,7 @@ const RecipeDetailPage = () => {
               </div>
             </>
           ) : (
-            renderDetailBody(recommendation!)
+            renderDetailBody((recommendationSnapshot ?? favoriteRecipe)!)
           )}
         </div>
       </div>
