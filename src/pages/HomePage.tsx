@@ -38,14 +38,23 @@ const HomePage = ({
   }, []);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session?.user) {
-        const user = session.user;
+    const updateUsername = (user: any) => {
+      if (user) {
         const displayName = user.user_metadata?.display_name || user.email?.split("@")[0] || "Guest";
         setUsername(displayName);
       } else {
         setUsername("Guest");
       }
+    };
+
+    // Load initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      updateUsername(session?.user ?? null);
+    });
+
+    // Listen for changes (including USER_UPDATED when name is changed)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      updateUsername(session?.user ?? null);
     });
 
     return () => subscription.unsubscribe();
