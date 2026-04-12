@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { onAuthStateChanged, getAuth } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { useQuery } from "@tanstack/react-query";
-import CookingRecommendationSection from "@/components/CookingRecommendationSection";
+import CookingRecommendationCard from "@/components/CookingRecommendationCard";
+import { Skeleton } from "@/components/ui/skeleton";
 import HeroSection from "@/components/HeroSection";
 import QuickActions from "@/components/QuickActions";
 import RestaurantCard from "@/components/RestaurantCard";
@@ -11,6 +13,7 @@ import { getCurrentPosition, type GeolocationFailure } from "@/lib/geolocation";
 import { getMealTimeContent } from "@/lib/mealTime";
 import { searchMealRecommendations, searchNearbyPlaces, type NearbyPlace } from "@/lib/nearbyPlaces";
 import { auth, db } from "@/lib/firebase";
+import { listCookingRecommendations } from "@/lib/cookingRecommendations";
 
 interface HomePageProps {
   onNavigate: (tab: string) => void;
@@ -27,6 +30,7 @@ const HomePage = ({
   onToggleFavoriteRestaurant,
   onToggleFavoriteRecipe,
 }: HomePageProps) => {
+  const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState(() => new Date());
   const [username, setUsername] = useState("Guest");
   const mealContent = useMemo(() => getMealTimeContent(currentTime), [currentTime]);
@@ -70,6 +74,19 @@ const HomePage = ({
   });
 
   const coordinates = locationQuery.data;
+
+  const cuisines = ["All", "Malay", "Chinese", "Indian", "Western"] as const;
+  const [selectedCuisine, setSelectedCuisine] = useState<(typeof cuisines)[number]>("All");
+
+  const cookingRecommendationsQuery = useQuery({
+    queryKey: ["home-time-cooking-recommendations", mealContent.mealPeriod],
+    staleTime: 5 * 60 * 1000,
+    queryFn: () => listCookingRecommendations({ mealType: mealContent.mealPeriod }),
+  });
+
+  const filteredCookingRecommendations = cookingRecommendationsQuery.data?.filter(
+    (recipe) => selectedCuisine === "All" || recipe.cuisine === selectedCuisine.toLowerCase(),
+  ) ?? [];
 
   const recommendedQuery = useQuery({
     queryKey: [
@@ -180,11 +197,92 @@ const HomePage = ({
       <div className="px-5 mt-6">
         <QuickActions onAction={onNavigate} />
 
-        <CookingRecommendationSection
-          mealType={mealContent.mealPeriod}
-          favoriteRecipeIds={favoriteRecipeIds}
-          onToggleFavoriteRecipe={onToggleFavoriteRecipe}
-        />
+        {/* Cooking Recommendations Section */}
+        <section className="mt-8">
+          <div>
+            <h2 className="text-xl font-display font-semibold text-foreground">Recommend to cook today</h2>
+            <p className="mt-1 text-sm font-body text-muted-foreground">
+              Discover delicious recipes you can make at home
+            </p>
+          </div>
+
+          {cookingRecommendationsQuery.isLoading && (
+            <div className="mt-4">
+              <p className="text-sm font-body text-muted-foreground">Loading cooking recommendations...</p>
+              <div className="mt-3 flex gap-4 overflow-x-auto pb-1">
+                {[0, 1, 2].map((item) => (
+                  <div key={item} className="w-[260px] flex-shrink-0 rounded-[24px] bg-card p-4 shadow-card">
+                    <Skeleton className="aspect-[4/3] rounded-2xl" />
+                    <Skeleton className="mt-4 h-4 w-24" />
+                    <Skeleton className="mt-3 h-5 w-40" />
+                    <Skeleton className="mt-2 h-4 w-full" />
+                    <Skeleton className="mt-2 h-4 w-4/5" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {cookingRecommendationsQuery.isError && (
+            <div className="mt-4 rounded-[24px] bg-card p-5 shadow-card">
+              <p className="text-sm font-body text-foreground">Could not load cooking recommendations right now.</p>
+              <p className="mt-1 text-xs font-body text-muted-foreground">
+                Please try again in a moment.
+              </p>
+            </div>
+          )}
+
+          {cookingRecommendationsQuery.data && cookingRecommendationsQuery.data.length > 0 && (
+            <>
+              <div className="mt-4">
+                <p className="text-xs font-body text-muted-foreground mb-2 uppercase tracking-wider font-bold">
+                  Filter by cuisine
+                </p>
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {cuisines.map((cuisine) => (
+                    <button
+                      key={cuisine}
+                      type="button"
+                      onClick={() => setSelectedCuisine(cuisine)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium font-body whitespace-nowrap transition-all ${
+                        selectedCuisine === cuisine
+                          ? "bg-primary text-primary-foreground shadow-elevated"
+                          : "bg-card text-foreground shadow-soft hover:shadow-card"
+                      }`}
+                    >
+                      {cuisine}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {filteredCookingRecommendations.length === 0 ? (
+                <div className="mt-4 rounded-[24px] bg-card p-5 shadow-card">
+                  <p className="text-sm font-body text-muted-foreground">
+                    No cooking recommendations found for {selectedCuisine} cuisine.
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-4 flex gap-4 overflow-x-auto pb-1">
+                  {filteredCookingRecommendations.slice(0, 6).map((recipe) => (
+                    <CookingRecommendationCard
+                      key={recipe.id}
+                      recommendation={recipe}
+                      isFavorited={favoriteRecipeIds.has(recipe.id)}
+                      onToggleFavorite={() => onToggleFavoriteRecipe(recipe)}
+                      onSelect={() => navigate(`/recipes/${recipe.id}`)}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {cookingRecommendationsQuery.data && cookingRecommendationsQuery.data.length === 0 && (
+            <div className="mt-4 rounded-[24px] bg-card p-5 shadow-card">
+              <p className="text-sm font-body text-muted-foreground">No cooking recommendations available right now.</p>
+            </div>
+          )}
+        </section>
 
         <div className="mt-8">
           <div className="flex items-center justify-between mb-4">

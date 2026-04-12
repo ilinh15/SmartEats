@@ -12,7 +12,7 @@ export interface CookingRecommendation {
   title: string;
   description: string;
   cuisine: CookingCuisine;
-  mealType: CookingMealType;
+  mealType: CookingMealType | CookingMealType[];
   cookTimeMinutes: number;
   ingredients: string[];
   instructions: string[];
@@ -71,6 +71,18 @@ const isCookingCuisine = (value: unknown): value is CookingCuisine =>
 const isCookingMealType = (value: unknown): value is CookingMealType =>
   typeof value === "string" && cookingMealTypes.includes(value as CookingMealType);
 
+const isCookingMealTypeOrArray = (value: unknown): value is CookingMealType | CookingMealType[] => {
+  if (isCookingMealType(value)) return true;
+  if (Array.isArray(value)) {
+    return value.every((item) => isCookingMealType(item));
+  }
+  return false;
+};
+
+const normalizeMealType = (value: CookingMealType | CookingMealType[]): CookingMealType[] => {
+  return Array.isArray(value) ? value : [value];
+};
+
 const toStringArray = (value: unknown) =>
   Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 
@@ -92,7 +104,7 @@ const mapRecommendation = (
   id: string,
   data: Record<string, unknown>,
 ): CookingRecommendation | null => {
-  if (!isCookingCuisine(data.cuisine) || !isCookingMealType(data.mealType)) {
+  if (!isCookingCuisine(data.cuisine) || !isCookingMealTypeOrArray(data.mealType)) {
     return null;
   }
 
@@ -101,7 +113,7 @@ const mapRecommendation = (
     title: String(data.title ?? ""),
     description: String(data.description ?? ""),
     cuisine: data.cuisine,
-    mealType: data.mealType,
+    mealType: normalizeMealType(data.mealType),
     cookTimeMinutes: Number(data.cookTimeMinutes ?? 0),
     ingredients: toStringArray(data.ingredients),
     instructions: toStringArray(data.instructions),
@@ -151,7 +163,11 @@ export const listCookingRecommendations = async ({
 
   return recommendations
     .filter((recommendation) => recommendation.isRecommended)
-    .filter((recommendation) => !mealType || recommendation.mealType === mealType)
+    .filter((recommendation) => {
+      if (!mealType) return true;
+      const mealTypes = normalizeMealType(recommendation.mealType);
+      return mealTypes.includes(mealType);
+    })
     .filter((recommendation) => !cuisine || recommendation.cuisine === cuisine)
     .sort((left, right) => {
       const recommendationDelta = Number(right.isRecommended) - Number(left.isRecommended);

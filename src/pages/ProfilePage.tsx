@@ -180,7 +180,7 @@ const ProfilePage = () => {
           {menuItems.map(({ label, icon: Icon }) => (
             <button
               key={label}
-              className="w-full flex items-center justify-between bg-card p-4 rounded-2xl shadow-soft"
+              className="w-full flex items-center justify-between bg-card p-4 rounded-2xl shadow-soft hover:shadow-md transition-shadow"
             >
               <div className="flex items-center gap-3">
                 <Icon size={18} className="text-muted-foreground" />

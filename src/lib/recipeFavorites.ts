@@ -32,7 +32,7 @@ export interface SavedRecipe {
   savedAt: string;
   cuisine?: CookingCuisine;
   cuisineLabel?: string;
-  mealType?: CookingMealType;
+  mealType?: CookingMealType | CookingMealType[];
   mealTypeLabel?: string;
   cookTimeMinutes?: number;
   cookTimeLabel?: string;

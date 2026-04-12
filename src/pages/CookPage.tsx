@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertCircle, ChefHat, ChevronRight, Clock, Heart, Search, Star, Users, X } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { recipes as allRecipes } from "@/data/recipes";
 import { generateRecipeWithGemini, type GeneratedRecipe } from "@/lib/recipeGeneration";
 import { createSavedRecipeFromGeneratedRecipe, type FavoriteRecipeInput } from "@/lib/recipeFavorites";
+import { listCookingRecommendations, type CookingRecommendation, COOKING_CUISINE_LABELS } from "@/lib/cookingRecommendations";
 import { useToast } from "@/hooks/use-toast";
 
 const suggestedIngredients = [
@@ -23,8 +25,25 @@ const suggestedIngredients = [
   "Salmon",
 ];
 
-const cuisines = ["All", "Chinese", "Malay", "Western", "Japanese", "Indian", "Korean"];
+const cuisines = ["All", "Malay", "Chinese", "Indian", "Western"];
 const EMPTY_FAVORITE_RECIPE_IDS = new Set<string>();
+
+// Mapping function to convert CookingRecommendation to Recipe format
+const mapCookingRecommendationToRecipe = (recommendation: CookingRecommendation) => ({
+  id: recommendation.id,
+  image: recommendation.imageUrl || "/placeholder-recipe.jpg", // Fallback image
+  title: recommendation.title,
+  description: recommendation.description,
+  time: `${recommendation.cookTimeMinutes} Min`,
+  tag: recommendation.tags?.[0] || "General", // Use first tag or default
+  tagColor: "primary" as const, // Default color
+  cuisine: COOKING_CUISINE_LABELS[recommendation.cuisine] || recommendation.cuisine,
+  servings: "2", // Default servings
+  rating: 4.5, // Default rating
+  difficulty: recommendation.difficulty || "Easy",
+  ingredients: recommendation.ingredients,
+  instructions: recommendation.instructions,
+});
 
 interface CookPageProps {
   favoriteRecipeIds?: ReadonlySet<string>;
@@ -36,6 +55,14 @@ const CookPage = ({
   onToggleFavoriteRecipe,
 }: CookPageProps) => {
   const { toast } = useToast();
+
+  // Query for cooking recommendations from Firebase
+  const cookingRecommendationsQuery = useQuery({
+    queryKey: ["cook-page-recommendations"],
+    queryFn: () => listCookingRecommendations({}),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
   const [selected, setSelected] = useState<string[]>([]);
   const [ingredientInput, setIngredientInput] = useState("");
   const [showResult, setShowResult] = useState(false);
@@ -106,7 +133,11 @@ const CookPage = ({
   };
 
   const filtered = useMemo(() => {
-    let results = allRecipes;
+    // Use Firebase data if available, otherwise fall back to hardcoded recipes
+    const firebaseRecipes = cookingRecommendationsQuery.data?.map(mapCookingRecommendationToRecipe) || [];
+    const allAvailableRecipes = firebaseRecipes.length > 0 ? firebaseRecipes : allRecipes;
+
+    let results = allAvailableRecipes;
 
     if (selectedCuisine !== "All") {
       results = results.filter((recipe) => recipe.cuisine === selectedCuisine);
@@ -124,7 +155,7 @@ const CookPage = ({
         recipe.description.toLowerCase().includes(query) ||
         recipe.ingredients.some((ingredient) => ingredient.toLowerCase().includes(query)),
     );
-  }, [search, selectedCuisine]);
+  }, [search, selectedCuisine, cookingRecommendationsQuery.data]);
 
   return (
     <div className="pb-20 min-h-screen" style={{ background: "var(--hero-gradient)" }}>
@@ -185,7 +216,7 @@ const CookPage = ({
 
         <div className="mt-4">
           <p className="text-xs font-body text-muted-foreground mb-2 uppercase tracking-wider font-bold">
-            Cuisine Type
+            Cuisine
           </p>
           <div className="flex gap-2 overflow-x-auto pb-1">
             {cuisines.map((cuisine) => (

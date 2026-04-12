@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import CookPage from "@/pages/CookPage";
@@ -15,6 +16,33 @@ vi.mock("@/lib/recipeGeneration", () => ({
   generateRecipeWithGemini: (...args: unknown[]) => mockGenerateRecipeWithGemini(...args),
 }));
 
+vi.mock("@/lib/cookingRecommendations", () => ({
+  listCookingRecommendations: vi.fn(() => Promise.resolve([])),
+  COOKING_CUISINE_LABELS: {
+    chinese: "Chinese",
+    malay: "Malay",
+    indian: "Indian",
+    japanese: "Japanese",
+    western: "Western",
+  },
+}));
+
+const renderCookPage = () => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <CookPage />
+    </QueryClientProvider>,
+  );
+};
+
 describe("CookPage clear all", () => {
   beforeEach(() => {
     mockToast.mockReset();
@@ -22,7 +50,7 @@ describe("CookPage clear all", () => {
   });
 
   it("clears selected ingredients and typed input without changing search", async () => {
-    render(<CookPage />);
+    renderCookPage();
 
     fireEvent.click(screen.getByRole("button", { name: "Chicken" }));
     fireEvent.click(screen.getByRole("button", { name: "Pasta" }));
@@ -56,7 +84,7 @@ describe("CookPage clear all", () => {
       instructions: ["Cook it", "Serve it"],
     });
 
-    render(<CookPage />);
+    renderCookPage();
 
     fireEvent.click(screen.getByRole("button", { name: "Chicken" }));
     fireEvent.click(screen.getByRole("button", { name: /let's cook/i }));
