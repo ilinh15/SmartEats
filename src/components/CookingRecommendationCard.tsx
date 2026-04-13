@@ -12,6 +12,7 @@ interface CookingRecommendationCardProps {
   recommendation: FavoriteRecipeInput;
   className?: string;
   isFavorited?: boolean;
+  compact?: boolean;
   onSelect?: () => void;
   onToggleFavorite?: (recommendation: FavoriteRecipeInput) => void;
 }
@@ -20,6 +21,7 @@ const CookingRecommendationCard = ({
   recommendation,
   className,
   isFavorited = false,
+  compact = false,
   onSelect,
   onToggleFavorite,
 }: CookingRecommendationCardProps) => {
@@ -76,81 +78,138 @@ const CookingRecommendationCard = ({
       tabIndex={onSelect ? 0 : undefined}
       aria-label={onSelect ? `Open ${recommendation.title} recipe details` : undefined}
     >
-      <div className="relative aspect-[4/3] overflow-hidden bg-accent/60">
-        {recommendation.imageUrl ? (
-          <img
-            src={recommendation.imageUrl}
-            alt={recommendation.title}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-            loading="lazy"
-          />
-        ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
-            <ImageOff size={20} />
-            <span className="text-xs font-body font-medium">No image available</span>
-          </div>
-        )}
-
-        {onToggleFavorite && (
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onToggleFavorite(recommendation);
-            }}
-            aria-label={
-              isFavorited
-                ? `Remove ${recommendation.title} from favorites`
-                : `Save ${recommendation.title} to favorites`
-            }
-            className={cn(
-              "absolute right-3 top-3 inline-flex h-10 w-10 items-center justify-center rounded-full border transition-colors",
-              isFavorited
-                ? "border-primary bg-primary text-primary-foreground shadow-soft"
-                : "border-border bg-background/90 text-muted-foreground hover:border-primary/40 hover:text-primary",
+      {compact ? (
+        <div className="flex items-start gap-4 p-4">
+          <div className="w-20 h-20 rounded-2xl overflow-hidden bg-accent/60 flex-shrink-0 flex items-center justify-center">
+            {recommendation.imageUrl ? (
+              <img
+                src={recommendation.imageUrl}
+                alt={recommendation.title}
+                className="h-full w-full object-cover"
+                loading="lazy"
+              />
+            ) : (
+              <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                <ImageOff size={18} />
+                <span className="text-[10px] font-body font-medium">No image</span>
+              </div>
             )}
-          >
-            <Heart size={16} fill={isFavorited ? "currentColor" : "none"} />
-          </button>
-        )}
-      </div>
+          </div>
 
-      <div className="p-4">
-        <div className="flex flex-wrap items-center gap-2">
-          {cookTimeLabel && (
-            <span className="inline-flex items-center gap-1 rounded-md bg-accent px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-accent-foreground">
-              <Clock size={10} />
-              {cookTimeLabel}
-            </span>
-          )}
-          {cuisineLabel && (
-            <span className="rounded-md bg-secondary/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-secondary">
-              {cuisineLabel}
-            </span>
-          )}
-          {mealLabel && (
-            <span className="rounded-md bg-primary/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">
-              {mealLabel}
-            </span>
-          )}
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              {cookTimeLabel && (
+                <span className="inline-flex items-center gap-1 rounded-md bg-accent px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-accent-foreground">
+                  <Clock size={10} />
+                  {cookTimeLabel}
+                </span>
+              )}
+              {cuisineLabel && (
+                <span className="rounded-md bg-secondary/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-secondary">
+                  {cuisineLabel}
+                </span>
+              )}
+              {mealLabel && (
+                <span className="rounded-md bg-primary/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">
+                  {mealLabel}
+                </span>
+              )}
+            </div>
+            <h3 className="mt-2 line-clamp-2 text-sm font-display font-semibold text-foreground">
+              {recommendation.title}
+            </h3>
+            <p className="mt-2 line-clamp-3 text-xs font-body text-muted-foreground">
+              {recommendation.description}
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] font-body text-muted-foreground">
+              {recommendation.difficulty && <span>{recommendation.difficulty}</span>}
+              {cardTags.map((tag) => (
+                <span key={tag} className="rounded-full bg-muted px-2 py-1">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
+      ) : (
+        <>
+          <div className="relative aspect-[4/3] overflow-hidden bg-accent/60">
+            {recommendation.imageUrl ? (
+              <img
+                src={recommendation.imageUrl}
+                alt={recommendation.title}
+                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                loading="lazy"
+              />
+            ) : (
+              <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
+                <ImageOff size={20} />
+                <span className="text-xs font-body font-medium">No image available</span>
+              </div>
+            )}
+          </div>
 
-        <h3 className="mt-3 line-clamp-2 text-base font-display font-semibold text-foreground">
-          {recommendation.title}
-        </h3>
-        <p className="mt-2 line-clamp-3 text-sm font-body text-muted-foreground">
-          {recommendation.description}
-        </p>
+          <div className="p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              {cookTimeLabel && (
+                <span className="inline-flex items-center gap-1 rounded-md bg-accent px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-accent-foreground">
+                  <Clock size={10} />
+                  {cookTimeLabel}
+                </span>
+              )}
+              {cuisineLabel && (
+                <span className="rounded-md bg-secondary/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-secondary">
+                  {cuisineLabel}
+                </span>
+              )}
+              {mealLabel && (
+                <span className="rounded-md bg-primary/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">
+                  {mealLabel}
+                </span>
+              )}
+            </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-body text-muted-foreground">
-          {recommendation.difficulty && <span>{recommendation.difficulty}</span>}
-          {cardTags.map((tag) => (
-            <span key={tag} className="rounded-full bg-muted px-2.5 py-1">
-              {tag}
-            </span>
-          ))}
-        </div>
-      </div>
+            <h3 className="mt-3 line-clamp-2 text-base font-display font-semibold text-foreground">
+              {recommendation.title}
+            </h3>
+            <p className="mt-2 line-clamp-3 text-sm font-body text-muted-foreground">
+              {recommendation.description}
+            </p>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-body text-muted-foreground">
+              {recommendation.difficulty && <span>{recommendation.difficulty}</span>}
+              {cardTags.map((tag) => (
+                <span key={tag} className="rounded-full bg-muted px-2.5 py-1">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {onToggleFavorite && (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggleFavorite(recommendation);
+          }}
+          aria-label={
+            isFavorited
+              ? `Remove ${recommendation.title} from favorites`
+              : `Save ${recommendation.title} to favorites`
+          }
+          className={cn(
+            "absolute right-3 top-3 inline-flex h-10 w-10 items-center justify-center rounded-full border transition-colors",
+            isFavorited
+              ? "border-primary bg-primary text-primary-foreground shadow-soft"
+              : "border-border bg-background/90 text-muted-foreground hover:border-primary/40 hover:text-primary",
+          )}
+        >
+          <Heart size={16} fill={isFavorited ? "currentColor" : "none"} />
+        </button>
+      )}
     </motion.article>
   );
 };

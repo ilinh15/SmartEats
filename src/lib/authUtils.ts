@@ -11,7 +11,11 @@ export interface UserProfile {
   email: string;
   preferences: string[];
   createdAt: string;
+  mealPlanner?: Record<string, { id: string; name: string }[]>;
 }
+
+export type MealPlannerEntry = { id: string; name: string };
+export type MealPlanner = Record<string, MealPlannerEntry[]>;
 
 /**
  * Get current authenticated user
@@ -73,6 +77,46 @@ export const updateUserPreferences = async (
     });
   } catch (error) {
     console.error("Error updating preferences:", error);
+    throw error;
+  }
+};
+
+export const getUserMealPlanner = async (
+  uid: string,
+): Promise<MealPlanner> => {
+  try {
+    const db = getFirestore();
+    const userDoc = await getDoc(doc(db, "users", uid));
+
+    if (!userDoc.exists()) {
+      return {};
+    }
+
+    const data = userDoc.data();
+
+    if (typeof data.mealPlanner === "object" && data.mealPlanner !== null) {
+      return data.mealPlanner as MealPlanner;
+    }
+
+    return {};
+  } catch (error) {
+    console.error("Error getting user meal planner:", error);
+    throw error;
+  }
+};
+
+export const updateUserMealPlanner = async (
+  uid: string,
+  mealPlanner: MealPlanner,
+): Promise<void> => {
+  try {
+    const db = getFirestore();
+    await updateDoc(doc(db, "users", uid), {
+      mealPlanner,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Error updating user meal planner:", error);
     throw error;
   }
 };

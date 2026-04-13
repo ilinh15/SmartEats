@@ -323,7 +323,12 @@ export const toggleFavoriteRecipe = async (
     savedAt: new Date().toISOString(),
   });
 
-  await setDoc(favoriteDocument, savedRecipe);
+  // Filter out undefined values before saving to Firestore
+  const dataToSave = Object.fromEntries(
+    Object.entries(savedRecipe).filter(([_, value]) => value !== undefined),
+  ) as SavedRecipe;
+
+  await setDoc(favoriteDocument, dataToSave);
 
   return savedRecipe;
 };

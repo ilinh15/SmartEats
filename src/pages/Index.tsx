@@ -223,6 +223,7 @@ const Index = () => {
           favoriteRestaurants={favoriteRestaurants}
           onToggleFavoriteRecipe={handleToggleFavoriteRecipe}
           onToggleFavoriteRestaurant={handleToggleFavoriteRestaurant}
+          userId={user?.uid}
         />
       )}
       {activeTab === "profile" && <ProfilePage />}

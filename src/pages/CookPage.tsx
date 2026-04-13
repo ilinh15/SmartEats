@@ -1,9 +1,13 @@
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertCircle, ChefHat, ChevronRight, Clock, Heart, Search, Star, Users, X } from "lucide-react";
-import { recipes as allRecipes } from "@/data/recipes";
+import { AlertCircle, ChefHat, Clock, Heart, Users, X } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { generateRecipeWithGemini, type GeneratedRecipe } from "@/lib/recipeGeneration";
 import { createSavedRecipeFromGeneratedRecipe, type FavoriteRecipeInput } from "@/lib/recipeFavorites";
+import { listCookingRecommendations, type CookingRecommendation, cookingCuisineFilters } from "@/lib/cookingRecommendations";
+import CookingRecommendationCard from "@/components/CookingRecommendationCard";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 
 const suggestedIngredients = [
@@ -23,7 +27,6 @@ const suggestedIngredients = [
   "Salmon",
 ];
 
-const cuisines = ["All", "Chinese", "Malay", "Western", "Japanese", "Indian", "Korean"];
 const EMPTY_FAVORITE_RECIPE_IDS = new Set<string>();
 
 interface CookPageProps {
@@ -36,13 +39,25 @@ const CookPage = ({
   onToggleFavoriteRecipe,
 }: CookPageProps) => {
   const { toast } = useToast();
+  const navigate = useNavigate();
+
+  // Query for cooking recommendations from Firebase (no meal type filter)
+  const cookingRecommendationsQuery = useQuery({
+    queryKey: ["cook-page-recommendations"],
+    queryFn: () => listCookingRecommendations({}),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
   const [selected, setSelected] = useState<string[]>([]);
   const [ingredientInput, setIngredientInput] = useState("");
   const [showResult, setShowResult] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState("");
-  const [expandedRecipe, setExpandedRecipe] = useState<string | null>(null);
-  const [selectedCuisine, setSelectedCuisine] = useState("All");
+  const [generationCuisine, setGenerationCuisine] = useState<"all" | "chinese" | "malay" | "indian" | "japanese" | "western">(
+    "all",
+  );
+  const [recommendationCuisine, setRecommendationCuisine] = useState<"all" | "chinese" | "malay" | "indian" | "japanese" | "western">(
+    "all",
+  );
   const [generatedRecipe, setGeneratedRecipe] = useState<GeneratedRecipe | null>(null);
   const [error, setError] = useState<string | null>(null);
   const hasCookSessionState = selected.length > 0 || ingredientInput.trim().length > 0 || !!generatedRecipe || !!error;
@@ -51,10 +66,10 @@ const CookPage = ({
       generatedRecipe
         ? createSavedRecipeFromGeneratedRecipe(generatedRecipe, {
             selectedIngredients: selected,
-            selectedCuisine,
+            selectedCuisine: generationCuisine,
           })
         : null,
-    [generatedRecipe, selected, selectedCuisine],
+    [generatedRecipe, selected, generationCuisine],
   );
   const isGeneratedRecipeFavorited = generatedFavoriteRecipe
     ? favoriteRecipeIds.has(generatedFavoriteRecipe.id)
@@ -89,7 +104,8 @@ const CookPage = ({
     setLoading(true);
     setError(null);
     try {
-      const recipe = await generateRecipeWithGemini(selected, selectedCuisine);
+      const cuisine = generationCuisine === "all" ? "" : generationCuisine;
+      const recipe = await generateRecipeWithGemini(selected, cuisine);
       setGeneratedRecipe(recipe);
       setShowResult(true);
     } catch (err) {
@@ -106,25 +122,14 @@ const CookPage = ({
   };
 
   const filtered = useMemo(() => {
-    let results = allRecipes;
-
-    if (selectedCuisine !== "All") {
-      results = results.filter((recipe) => recipe.cuisine === selectedCuisine);
+    const recommendations = cookingRecommendationsQuery.data ?? [];
+    let results = recommendations;
+    if (recommendationCuisine !== "all") {
+      results = results.filter((recipe) => recipe.cuisine === recommendationCuisine);
     }
-
-    if (!search.trim()) {
-      return results;
-    }
-
-    const query = search.toLowerCase();
-    return results.filter(
-      (recipe) =>
-        recipe.title.toLowerCase().includes(query) ||
-        recipe.tag.toLowerCase().includes(query) ||
-        recipe.description.toLowerCase().includes(query) ||
-        recipe.ingredients.some((ingredient) => ingredient.toLowerCase().includes(query)),
-    );
-  }, [search, selectedCuisine]);
+    return results;
+  }, [cookingRecommendationsQuery.data, recommendationCuisine]);
+  const isFiltered = recommendationCuisine !== "all";
 
   return (
     <div className="pb-20 min-h-screen" style={{ background: "var(--hero-gradient)" }}>
@@ -185,20 +190,21 @@ const CookPage = ({
 
         <div className="mt-4">
           <p className="text-xs font-body text-muted-foreground mb-2 uppercase tracking-wider font-bold">
-            Cuisine Type
+            Cuisine
           </p>
           <div className="flex gap-2 overflow-x-auto pb-1">
-            {cuisines.map((cuisine) => (
+            {cookingCuisineFilters.map((filter) => (
               <button
-                key={cuisine}
-                onClick={() => setSelectedCuisine(cuisine)}
+                key={filter.value}
+                type="button"
+                onClick={() => setGenerationCuisine(filter.value)}
                 className={`px-4 py-1.5 rounded-full text-xs font-medium font-body whitespace-nowrap transition-all ${
-                  selectedCuisine === cuisine
+                  generationCuisine === filter.value
                     ? "bg-primary text-primary-foreground shadow-elevated"
                     : "bg-card text-foreground shadow-soft hover:shadow-card"
                 }`}
               >
-                {cuisine}
+                {filter.label}
               </button>
             ))}
           </div>
@@ -357,125 +363,86 @@ const CookPage = ({
 
         <div className="my-8 h-px bg-border" />
 
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
-          <input
-            type="text"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search food, recipes, ingredients..."
-            className="w-full h-12 pl-11 pr-4 bg-card rounded-2xl shadow-soft text-sm font-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:shadow-card transition-all"
-          />
-        </div>
+        <section className="mt-8">
+          <div>
+            <h2 className="text-xl font-display font-semibold text-foreground">Recipes to cook</h2>
+            <p className="mt-1 text-sm font-body text-muted-foreground">
+              Explore our collection of recipes.
+            </p>
+          </div>
 
-        <div className="mt-6">
-          <h2 className="text-xl font-display font-semibold text-foreground mb-4">
-            {search.trim() ? "Search Results" : "Recommended Recipes"}
-          </h2>
+          <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+            {cookingCuisineFilters.map((filter) => (
+              <button
+                key={filter.value}
+                type="button"
+                onClick={() => setRecommendationCuisine(filter.value)}
+                className={`whitespace-nowrap rounded-full px-4 py-2 text-xs font-medium font-body transition-all ${
+                  recommendationCuisine === filter.value
+                    ? "bg-primary text-primary-foreground shadow-elevated"
+                    : "bg-card text-foreground shadow-soft hover:shadow-card"
+                }`}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
 
-          {filtered.length === 0 ? (
-            <div className="text-center py-10">
-              <p className="text-muted-foreground font-body text-sm">No recipes found for "{search}"</p>
+          {cookingRecommendationsQuery.isLoading && (
+            <div className="mt-4">
+              <p className="text-sm font-body text-muted-foreground">Loading recipes...</p>
+              <div className="mt-3 flex flex-col gap-4">
+                {[0, 1, 2].map((item) => (
+                  <div key={item} className="rounded-[24px] bg-card p-4 shadow-card">
+                    <Skeleton className="aspect-[4/3] rounded-2xl" />
+                    <Skeleton className="mt-4 h-4 w-24" />
+                    <Skeleton className="mt-3 h-5 w-40" />
+                    <Skeleton className="mt-2 h-4 w-full" />
+                    <Skeleton className="mt-2 h-4 w-4/5" />
+                  </div>
+                ))}
+              </div>
             </div>
-          ) : (
-            <div className="flex flex-col gap-4">
-              {filtered.map((recipe, index) => (
-                <motion.div
-                  key={recipe.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className="bg-card rounded-[20px] shadow-card overflow-hidden"
-                >
-                  <button
-                    onClick={() => setExpandedRecipe(expandedRecipe === recipe.id ? null : recipe.id)}
-                    className="w-full flex items-center gap-3 p-3 text-left"
-                  >
-                    <img
-                      src={recipe.image}
-                      alt={recipe.title}
-                      className="w-20 h-20 rounded-2xl object-cover flex-shrink-0"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-display font-semibold text-foreground text-sm leading-tight">
-                        {recipe.title}
-                      </h3>
-                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                        <span className="flex items-center gap-1 text-[11px] text-muted-foreground font-body">
-                          <Clock size={11} /> {recipe.time}
-                        </span>
-                        <span className="flex items-center gap-1 text-[11px] text-muted-foreground font-body">
-                          <Users size={11} /> {recipe.servings} Servings
-                        </span>
-                        <span className="flex items-center gap-0.5 text-[11px] text-accent-foreground font-body font-bold">
-                          <Star size={11} className="fill-accent-foreground text-accent-foreground" /> {recipe.rating}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <span className="px-2 py-0.5 bg-secondary/10 text-secondary rounded-md text-[10px] font-bold uppercase tracking-wider">
-                          {recipe.tag}
-                        </span>
-                        <span className="px-2 py-0.5 bg-accent text-accent-foreground rounded-md text-[10px] font-bold uppercase tracking-wider">
-                          {recipe.difficulty}
-                        </span>
-                      </div>
-                    </div>
-                    <ChevronRight
-                      size={18}
-                      className={`text-muted-foreground transition-transform flex-shrink-0 ${
-                        expandedRecipe === recipe.id ? "rotate-90" : ""
-                      }`}
-                    />
-                  </button>
+          )}
 
-                  <AnimatePresence>
-                    {expandedRecipe === recipe.id && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="px-4 pb-4 pt-1 border-t border-border">
-                          <div className="rounded-2xl overflow-hidden mt-3 mb-4">
-                            <img src={recipe.image} alt={recipe.title} className="w-full aspect-video object-cover" />
-                          </div>
+          {cookingRecommendationsQuery.isError && (
+            <div className="mt-4 rounded-[24px] bg-card p-5 shadow-card">
+              <p className="text-sm font-body text-foreground">Could not load recipes right now.</p>
+              <p className="mt-1 text-xs font-body text-muted-foreground">Please try again in a moment.</p>
+              <button
+                type="button"
+                onClick={() => cookingRecommendationsQuery.refetch()}
+                className="mt-4 rounded-full bg-primary px-4 py-2 text-xs font-bold uppercase tracking-wider text-primary-foreground shadow-soft"
+              >
+                Try again
+              </button>
+            </div>
+          )}
 
-                          <p className="text-sm text-muted-foreground font-body mb-4">{recipe.description}</p>
+          {!cookingRecommendationsQuery.isLoading && !cookingRecommendationsQuery.isError && filtered.length === 0 && (
+            <div className="mt-4 rounded-[24px] bg-card p-5 shadow-card">
+              <p className="text-sm font-body text-foreground">
+                {isFiltered ? "No recipes found for this cuisine." : "No recipes found right now."}
+              </p>
+              <p className="mt-1 text-xs font-body text-muted-foreground">
+                {isFiltered ? "Try another cuisine." : "Check back later for fresh recipes."}
+              </p>
+            </div>
+          )}
 
-                          <h4 className="text-sm font-display font-semibold text-foreground mb-2">Ingredients</h4>
-                          <ul className="space-y-1 mb-4">
-                            {recipe.ingredients.map((ingredient) => (
-                              <li
-                                key={ingredient}
-                                className="text-sm text-muted-foreground font-body flex items-center gap-2"
-                              >
-                                <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
-                                {ingredient}
-                              </li>
-                            ))}
-                          </ul>
-
-                          <h4 className="text-sm font-display font-semibold text-foreground mb-2">Instructions</h4>
-                          <ol className="space-y-2">
-                            {recipe.instructions.map((step, stepIndex) => (
-                              <li key={step} className="text-sm text-muted-foreground font-body flex gap-2">
-                                <span className="w-5 h-5 rounded-full bg-primary/10 text-primary flex-shrink-0 flex items-center justify-center text-[10px] font-bold mt-0.5">
-                                  {stepIndex + 1}
-                                </span>
-                                {step}
-                              </li>
-                            ))}
-                          </ol>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
+          {!cookingRecommendationsQuery.isLoading && !cookingRecommendationsQuery.isError && filtered.length > 0 && (
+            <div className="mt-4 flex flex-col gap-4">
+              {filtered.map((recommendation) => (
+                <CookingRecommendationCard
+                  key={recommendation.id}
+                  recommendation={recommendation}
+                  isFavorited={favoriteRecipeIds.has(recommendation.id)}                compact                  onSelect={() => navigate(`/recipes/${recommendation.id}`)}
+                  onToggleFavorite={onToggleFavoriteRecipe}
+                />
               ))}
             </div>
           )}
-        </div>
+        </section>
       </div>
     </div>
   );

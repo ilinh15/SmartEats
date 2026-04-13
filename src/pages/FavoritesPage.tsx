@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CalendarDays, Heart, Plus, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 import CookingRecommendationCard from "@/components/CookingRecommendationCard";
 import RestaurantCard from "@/components/RestaurantCard";
 import type { NearbyPlace } from "@/lib/nearbyPlaces";
+import { getUserMealPlanner, updateUserMealPlanner, type MealPlanner } from "@/lib/authUtils";
 import type { FavoriteRecipeInput, SavedRecipe } from "@/lib/recipeFavorites";
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -13,23 +15,31 @@ type Meal = { id: string; name: string };
 type WeekMeals = Record<string, Meal[]>;
 
 const initialMeals: WeekMeals = {
-  Mon: [
-    { id: "1", name: "Oatmeal Breakfast" },
-    { id: "2", name: "Grilled Chicken Lunch" },
-  ],
-  Tue: [{ id: "3", name: "Smoothie Bowl" }],
+  Mon: [],
+  Tue: [],
   Wed: [],
-  Thu: [{ id: "4", name: "Pesto Pasta" }],
+  Thu: [],
   Fri: [],
-  Sat: [{ id: "5", name: "Avocado Toast" }],
+  Sat: [],
   Sun: [],
 };
+
+const normalizePlanner = (planner: MealPlanner): WeekMeals => ({
+  Mon: planner.Mon ?? [],
+  Tue: planner.Tue ?? [],
+  Wed: planner.Wed ?? [],
+  Thu: planner.Thu ?? [],
+  Fri: planner.Fri ?? [],
+  Sat: planner.Sat ?? [],
+  Sun: planner.Sun ?? [],
+});
 
 interface FavoritesPageProps {
   favoriteRecipes: SavedRecipe[];
   favoriteRestaurants: NearbyPlace[];
   onToggleFavoriteRecipe: (recipe: FavoriteRecipeInput) => void;
   onToggleFavoriteRestaurant: (restaurant: NearbyPlace) => void;
+  userId?: string;
 }
 
 const FavoritesPage = ({
@@ -37,32 +47,93 @@ const FavoritesPage = ({
   favoriteRestaurants,
   onToggleFavoriteRecipe,
   onToggleFavoriteRestaurant,
+  userId,
 }: FavoritesPageProps) => {
   const [activeTab, setActiveTab] = useState("Recipes");
   const [selectedDay, setSelectedDay] = useState("Mon");
   const [weekMeals, setWeekMeals] = useState<WeekMeals>(initialMeals);
   const [isAdding, setIsAdding] = useState(false);
   const [newMealName, setNewMealName] = useState("");
+  const [isLoadingPlanner, setIsLoadingPlanner] = useState(false);
+  const { toast } = useToast();
   const tabs = ["Recipes", `Restaurants (${favoriteRestaurants.length})`, "Planner"];
   const navigate = useNavigate();
 
+  const savePlanner = async (nextPlanner: WeekMeals) => {
+    setWeekMeals(nextPlanner);
+
+    if (!userId) {
+      return;
+    }
+
+    try {
+      await updateUserMealPlanner(userId, nextPlanner as MealPlanner);
+    } catch (error) {
+      console.error("Failed to save planner:", error);
+      toast({
+        title: "Could not save planner",
+        description: "Your meal plan could not be saved right now.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleDeleteMeal = (day: string, mealId: string) => {
-    setWeekMeals((prev) => ({
-      ...prev,
-      [day]: prev[day].filter((meal) => meal.id !== mealId),
-    }));
+    const nextPlanner = {
+      ...weekMeals,
+      [day]: weekMeals[day].filter((meal) => meal.id !== mealId),
+    };
+
+    savePlanner(nextPlanner);
   };
 
   const handleAddMeal = () => {
     if (!newMealName.trim()) return;
     const newMeal: Meal = { id: Date.now().toString(), name: newMealName.trim() };
-    setWeekMeals((prev) => ({
-      ...prev,
-      [selectedDay]: [...(prev[selectedDay] || []), newMeal],
-    }));
+    const nextPlanner = {
+      ...weekMeals,
+      [selectedDay]: [...(weekMeals[selectedDay] || []), newMeal],
+    };
+
+    savePlanner(nextPlanner);
     setNewMealName("");
     setIsAdding(false);
   };
+
+  useEffect(() => {
+    if (!userId) {
+      setWeekMeals(initialMeals);
+      return;
+    }
+
+    let isActive = true;
+    setIsLoadingPlanner(true);
+
+    getUserMealPlanner(userId)
+      .then((planner) => {
+        if (!isActive) {
+          return;
+        }
+        setWeekMeals(normalizePlanner(planner));
+      })
+      .catch((error) => {
+        console.error("Failed to load planner:", error);
+        toast({
+          title: "Could not load planner",
+          description: "Your saved meal plan could not be loaded right now.",
+          variant: "destructive",
+        });
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsLoadingPlanner(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [userId, toast]);
 
   return (
     <div className="pb-20 min-h-screen">
@@ -103,6 +174,7 @@ const FavoritesPage = ({
                   >
                     <CookingRecommendationCard
                       recommendation={recipe}
+                      compact
                       className="w-full"
                       isFavorited
                       onSelect={() => navigate(`/recipes/${recipe.id}`)}
@@ -152,6 +224,9 @@ const FavoritesPage = ({
 
           {activeTab === "Planner" && (
             <div className="space-y-4">
+              {isLoadingPlanner ? (
+                <p className="text-sm text-muted-foreground">Loading planner...</p>
+              ) : null}
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {days.map((day) => (
                   <button
