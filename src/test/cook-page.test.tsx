@@ -1,6 +1,9 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import CookPage from "@/pages/CookPage";
+import { listCookingRecommendations } from "@/lib/cookingRecommendations";
 
 const mockToast = vi.fn();
 const mockGenerateRecipeWithGemini = vi.fn();
@@ -15,22 +18,50 @@ vi.mock("@/lib/recipeGeneration", () => ({
   generateRecipeWithGemini: (...args: unknown[]) => mockGenerateRecipeWithGemini(...args),
 }));
 
+vi.mock("@/lib/cookingRecommendations", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/cookingRecommendations")>("@/lib/cookingRecommendations");
+
+  return {
+    ...actual,
+    listCookingRecommendations: vi.fn(),
+  };
+});
+
+const mockedListCookingRecommendations = vi.mocked(listCookingRecommendations);
+
+const renderCookPage = () => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+
+  return render(
+    <MemoryRouter>
+      <QueryClientProvider client={queryClient}>
+        <CookPage />
+      </QueryClientProvider>
+    </MemoryRouter>,
+  );
+};
+
 describe("CookPage clear all", () => {
   beforeEach(() => {
     mockToast.mockReset();
     mockGenerateRecipeWithGemini.mockReset();
+    mockedListCookingRecommendations.mockReset();
+    mockedListCookingRecommendations.mockResolvedValue([]);
   });
 
-  it("clears selected ingredients and typed input without changing search", async () => {
-    render(<CookPage />);
+  it("clears selected ingredients and typed input", async () => {
+    renderCookPage();
 
     fireEvent.click(screen.getByRole("button", { name: "Chicken" }));
     fireEvent.click(screen.getByRole("button", { name: "Pasta" }));
     fireEvent.change(screen.getByPlaceholderText(/type an ingredient and press enter/i), {
       target: { value: "Lime" },
-    });
-    fireEvent.change(screen.getByPlaceholderText(/search food, recipes, ingredients/i), {
-      target: { value: "salad" },
     });
 
     fireEvent.click(screen.getByRole("button", { name: /clear all/i }));
@@ -40,7 +71,6 @@ describe("CookPage clear all", () => {
       expect(screen.getAllByText("Pasta")).toHaveLength(1);
     });
     expect(screen.getByPlaceholderText(/type an ingredient and press enter/i)).toHaveValue("");
-    expect(screen.getByPlaceholderText(/search food, recipes, ingredients/i)).toHaveValue("salad");
     expect(screen.queryByRole("button", { name: /clear all/i })).not.toBeInTheDocument();
   });
 
@@ -56,7 +86,7 @@ describe("CookPage clear all", () => {
       instructions: ["Cook it", "Serve it"],
     });
 
-    render(<CookPage />);
+    renderCookPage();
 
     fireEvent.click(screen.getByRole("button", { name: "Chicken" }));
     fireEvent.click(screen.getByRole("button", { name: /let's cook/i }));

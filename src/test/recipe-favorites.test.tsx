@@ -145,7 +145,9 @@ describe("recipe favorites flow", () => {
     fireEvent.click(within(navigation).getByRole("button", { name: /cook/i }));
 
     fireEvent.click(screen.getByRole("button", { name: "Chicken" }));
-    fireEvent.click(screen.getByRole("button", { name: "Japanese" }));
+    const generationCuisineSection = screen.getByText(/^Cuisine$/i).parentElement;
+    expect(generationCuisineSection).not.toBeNull();
+    fireEvent.click(within(generationCuisineSection as HTMLElement).getByRole("button", { name: "Japanese" }));
     fireEvent.click(screen.getByRole("button", { name: /let's cook/i }));
 
     expect(await screen.findByRole("heading", { name: "Test Curry" })).toBeInTheDocument();

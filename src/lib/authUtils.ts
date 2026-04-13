@@ -6,12 +6,31 @@
 import { getAuth, signOut } from "firebase/auth";
 import { getFirestore, doc, getDoc, updateDoc } from "firebase/firestore";
 
+export const BUDGET_PREFERENCES = ["Budget-friendly", "Moderate", "Premium"] as const;
+
+export type BudgetPreference = (typeof BUDGET_PREFERENCES)[number];
+
+export interface NotificationSettings {
+  push: boolean;
+  email: boolean;
+  mealReminders: boolean;
+}
+
+export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
+  push: true,
+  email: true,
+  mealReminders: true,
+};
+
 export interface UserProfile {
   username: string;
   email: string;
   preferences: string[];
   createdAt: string;
   mealPlanner?: Record<string, { id: string; name: string }[]>;
+  budgetPreference?: BudgetPreference | null;
+  notificationSettings?: NotificationSettings;
+  updatedAt?: string;
 }
 
 export type MealPlannerEntry = { id: string; name: string };
@@ -207,6 +226,26 @@ export const isValidEmail = (email: string): boolean => {
   return emailRegex.test(email);
 };
 
+export const isBudgetPreference = (value: string): value is BudgetPreference =>
+  BUDGET_PREFERENCES.includes(value as BudgetPreference);
+
+export const normalizeNotificationSettings = (
+  value?: Partial<NotificationSettings> | null,
+): NotificationSettings => ({
+  push:
+    typeof value?.push === "boolean"
+      ? value.push
+      : DEFAULT_NOTIFICATION_SETTINGS.push,
+  email:
+    typeof value?.email === "boolean"
+      ? value.email
+      : DEFAULT_NOTIFICATION_SETTINGS.email,
+  mealReminders:
+    typeof value?.mealReminders === "boolean"
+      ? value.mealReminders
+      : DEFAULT_NOTIFICATION_SETTINGS.mealReminders,
+});
+
 /**
  * Validate password strength
  * @param password - Password to validate
@@ -249,6 +288,8 @@ export const getAuthErrorMessage = (errorCode: string): string => {
     "auth/network-request-failed": "Network error. Please check your internet connection.",
     "auth/operation-not-allowed": "This operation is not allowed.",
     "auth/invalid-credential": "Invalid credentials. Please try again.",
+    "auth/requires-recent-login":
+      "Please log in again before retrying this account change.",
   };
 
   return errorMessages[errorCode] || "An error occurred. Please try again.";
