@@ -4,6 +4,7 @@ export interface MockAuthUser {
   uid: string;
   displayName?: string | null;
   email?: string | null;
+  password?: string | null;
 }
 
 type FirestoreDocumentData = Record<string, unknown>;
@@ -13,6 +14,7 @@ const DEFAULT_USER: MockAuthUser = {
   uid: "test-user",
   displayName: "Test User",
   email: "test@example.com",
+  password: "password123",
 };
 
 const documentStore = new Map<string, FirestoreDocumentData>();
@@ -24,6 +26,11 @@ const mockAuth = {
 
 const cloneDocument = (value: FirestoreDocumentData) =>
   JSON.parse(JSON.stringify(value)) as FirestoreDocumentData;
+
+const mergeDocuments = (existing: FirestoreDocumentData | undefined, incoming: FirestoreDocumentData) => ({
+  ...(existing ? cloneDocument(existing) : {}),
+  ...cloneDocument(incoming),
+});
 
 const joinPath = (segments: unknown[]) => segments.map(String).join("/");
 
@@ -42,7 +49,17 @@ const isDirectChildPath = (collectionPath: string, documentPath: string) => {
 };
 
 const seedDefaultDocuments = () => {
-  documentStore.set(`users/${DEFAULT_USER.uid}`, { username: "Test User" });
+  documentStore.set(`users/${DEFAULT_USER.uid}`, {
+    username: "Test User",
+    email: DEFAULT_USER.email,
+    preferences: [],
+    budgetPreference: null,
+    notificationSettings: {
+      push: true,
+      email: true,
+      mealReminders: true,
+    },
+  });
   documentStore.set("cooking_recommendations/tamago-sando", {
     title: "Tamago Sando",
     description: "Creamy Japanese egg salad tucked into pillowy milk bread for a soft, satisfying bite.",
@@ -123,6 +140,23 @@ export const firebaseAuthModuleMock = {
   }),
   signInWithEmailAndPassword: vi.fn(),
   createUserWithEmailAndPassword: vi.fn(),
+  updateProfile: vi.fn(async (user: MockAuthUser, data: { displayName?: string | null }) => {
+    if (Object.prototype.hasOwnProperty.call(data, "displayName")) {
+      user.displayName = data.displayName ?? null;
+    }
+
+    if (mockAuth.currentUser?.uid === user.uid) {
+      mockAuth.currentUser = { ...mockAuth.currentUser, displayName: user.displayName ?? null };
+    }
+  }),
+  verifyBeforeUpdateEmail: vi.fn(async (_user: MockAuthUser, _newEmail: string) => {}),
+  updatePassword: vi.fn(async (user: MockAuthUser, newPassword: string) => {
+    user.password = newPassword;
+
+    if (mockAuth.currentUser?.uid === user.uid) {
+      mockAuth.currentUser = { ...mockAuth.currentUser, password: newPassword };
+    }
+  }),
 };
 
 export const firebaseFirestoreModuleMock = {
@@ -150,8 +184,18 @@ export const firebaseFirestoreModuleMock = {
       data: () => cloneDocument(document.data),
     })),
   })),
-  setDoc: vi.fn(async (reference: { path: string }, data: FirestoreDocumentData) => {
+  setDoc: vi.fn(async (reference: { path: string }, data: FirestoreDocumentData, options?: { merge?: boolean }) => {
+    if (options?.merge) {
+      const existing = documentStore.get(reference.path);
+      documentStore.set(reference.path, mergeDocuments(existing, data));
+      return;
+    }
+
     documentStore.set(reference.path, cloneDocument(data));
+  }),
+  updateDoc: vi.fn(async (reference: { path: string }, data: FirestoreDocumentData) => {
+    const existing = documentStore.get(reference.path);
+    documentStore.set(reference.path, mergeDocuments(existing, data));
   }),
   deleteDoc: vi.fn(async (reference: { path: string }) => {
     documentStore.delete(reference.path);
