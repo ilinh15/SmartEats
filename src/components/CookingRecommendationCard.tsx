@@ -34,9 +34,11 @@ const CookingRecommendationCard = ({
   const mealLabel =
     "mealTypeLabel" in recommendation && recommendation.mealTypeLabel
       ? recommendation.mealTypeLabel
-      : recommendation.mealType
-        ? COOKING_MEAL_LABELS[recommendation.mealType]
-        : undefined;
+      : Array.isArray(recommendation.mealType)
+        ? COOKING_MEAL_LABELS[recommendation.mealType[0]]
+        : recommendation.mealType
+          ? COOKING_MEAL_LABELS[recommendation.mealType]
+          : undefined;
   const cookTimeLabel =
     "cookTimeLabel" in recommendation && recommendation.cookTimeLabel
       ? recommendation.cookTimeLabel

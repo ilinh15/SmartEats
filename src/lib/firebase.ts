@@ -1,6 +1,7 @@
 import { initializeApp, type FirebaseApp } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
+import { getMessaging, type Messaging } from "firebase/messaging";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -18,13 +19,16 @@ export const isFirebaseConfigured = Object.values(firebaseConfig).every(
 let firebaseApp: FirebaseApp | null = null;
 let firestoreDb: Firestore | null = null;
 let firebaseAuth: Auth | null = null;
+let firebaseMessaging: Messaging | null = null;
 
 if (isFirebaseConfigured) {
   firebaseApp = initializeApp(firebaseConfig);
   firebaseAuth = getAuth(firebaseApp);
   firestoreDb = getFirestore(firebaseApp);
+  firebaseMessaging = getMessaging(firebaseApp);
 }
 
 export const app = firebaseApp;
 export const auth = firebaseAuth;
 export const db = firestoreDb;
+export const messaging = firebaseMessaging;
