@@ -2,7 +2,6 @@ import { motion } from "framer-motion";
 import { Clock, Heart, ImageOff } from "lucide-react";
 import {
   COOKING_CUISINE_LABELS,
-  COOKING_MEAL_LABELS,
   formatCookTimeMinutes,
 } from "@/lib/cookingRecommendations";
 import { cn } from "@/lib/utils";
@@ -31,14 +30,6 @@ const CookingRecommendationCard = ({
       : recommendation.cuisine
         ? COOKING_CUISINE_LABELS[recommendation.cuisine]
         : undefined;
-  const mealLabel =
-    "mealTypeLabel" in recommendation && recommendation.mealTypeLabel
-      ? recommendation.mealTypeLabel
-      : Array.isArray(recommendation.mealType)
-        ? COOKING_MEAL_LABELS[recommendation.mealType[0]]
-        : recommendation.mealType
-          ? COOKING_MEAL_LABELS[recommendation.mealType]
-          : undefined;
   const cookTimeLabel =
     "cookTimeLabel" in recommendation && recommendation.cookTimeLabel
       ? recommendation.cookTimeLabel
@@ -111,11 +102,6 @@ const CookingRecommendationCard = ({
                   {cuisineLabel}
                 </span>
               )}
-              {mealLabel && (
-                <span className="rounded-md bg-primary/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">
-                  {mealLabel}
-                </span>
-              )}
             </div>
             <h3 className="mt-2 line-clamp-2 text-sm font-display font-semibold text-foreground">
               {recommendation.title}
@@ -162,11 +148,6 @@ const CookingRecommendationCard = ({
               {cuisineLabel && (
                 <span className="rounded-md bg-secondary/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-secondary">
                   {cuisineLabel}
-                </span>
-              )}
-              {mealLabel && (
-                <span className="rounded-md bg-primary/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">
-                  {mealLabel}
                 </span>
               )}
             </div>
