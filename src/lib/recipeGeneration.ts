@@ -10,6 +10,24 @@ export interface GeneratedRecipe {
   imageUrl?: string;
 }
 
+interface GeminiResponse {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        text?: string;
+      }>;
+    };
+  }>;
+}
+
+interface MistralResponse {
+  choices?: Array<{
+    message?: {
+      content?: string;
+    };
+  }>;
+}
+
 /**
  * Fetch a recipe image from Unsplash API
  * Uses the recipe title to search for relevant images
@@ -149,7 +167,7 @@ Return ONLY the JSON object, no markdown, no code blocks, no explanations. Valid
           throw new Error(`Mistral API returned HTML instead of JSON`);
         }
 
-        const data = JSON.parse(responseText) as any;
+        const data = JSON.parse(responseText) as MistralResponse;
         const textContent = data?.choices?.[0]?.message?.content;
 
         if (!textContent) {
@@ -218,7 +236,7 @@ Return ONLY the JSON object, no markdown, no code blocks, no explanations. Valid
         throw new Error(`Gemini API returned HTML. Check your API key and model name.`);
       }
 
-      const data = JSON.parse(trimmedResponseText) as any;
+      const data = JSON.parse(trimmedResponseText) as GeminiResponse;
       const textContent = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
       if (!textContent) {

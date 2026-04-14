@@ -324,7 +324,12 @@ const ProfilePage = () => {
   }, [authClient]);
 
   useEffect(() => {
-    resetDrafts();
+    setDisplayNameDraft(displayName);
+    setEmailDraft(email);
+    setNewPassword("");
+    setConfirmPassword("");
+    setPreferencesDraft(preferences);
+    setBudgetDraft(budgetPreference);
   }, [displayName, email, preferences, budgetPreference]);
 
   const handleLogout = async () => {

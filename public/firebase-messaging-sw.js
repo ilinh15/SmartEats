@@ -12,18 +12,51 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 
+self.addEventListener('install', (event) => {
+  event.waitUntil(self.skipWaiting());
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
   console.log('Received background message ', payload);
 
-  const notificationTitle = payload.notification.title;
+  const notificationTitle = payload.notification?.title;
+  const notificationBody = payload.notification?.body;
+
+  if (!notificationTitle) {
+    return;
+  }
+
+  // Ignore debug-style notifications so users do not see the white "Notification debug" box.
+  const titleLower = notificationTitle.toLowerCase();
+  const bodyLower = (notificationBody || '').toLowerCase();
+  if (
+    titleLower.includes('debug') ||
+    titleLower.includes('notification debug') ||
+    bodyLower.includes('status:') ||
+    bodyLower.includes('permission:') ||
+    bodyLower.includes('token:')
+  ) {
+    return;
+  }
+
   const notificationOptions = {
-    body: payload.notification.body,
+    body: notificationBody,
     icon: 'https://cdn.creativefabrica.com/2020/02/11/Food-Logo-Graphics-1-71-580x386.jpg',
     badge: 'https://cdn.creativefabrica.com/2020/02/11/Food-Logo-Graphics-1-71-580x386.jpg',
     tag: 'smarteats-notification',
-    requireInteraction: false
+    requireInteraction: false,
   };
 
   self.registration.showNotification(notificationTitle, notificationOptions);

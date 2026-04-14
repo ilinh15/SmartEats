@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, FirebaseError } from "firebase/auth";
 import { getAuth } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,8 +40,9 @@ const LoginPage = () => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
       navigate("/");
-    } catch (err: any) {
-      const errorCode = err.code;
+    } catch (err: unknown) {
+      const error = err as FirebaseError;
+      const errorCode = error.code;
       if (
         errorCode === "auth/user-not-found" ||
         errorCode === "auth/wrong-password" ||

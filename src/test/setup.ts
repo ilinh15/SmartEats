@@ -21,9 +21,28 @@ Object.defineProperty(window, "matchMedia", {
   }),
 });
 
+Object.defineProperty(navigator, "serviceWorker", {
+  writable: true,
+  value: {
+    register: vi.fn(async () => ({ scope: "/" })),
+    ready: Promise.resolve({ scope: "/" }),
+  },
+});
+
+Object.defineProperty(window, "Notification", {
+  writable: true,
+  value: {
+    requestPermission: vi.fn(async () => "granted"),
+  },
+});
+
 vi.mock("@/lib/firebase", () => firebaseModuleMock);
 vi.mock("firebase/auth", () => firebaseAuthModuleMock);
 vi.mock("firebase/firestore", () => firebaseFirestoreModuleMock);
+vi.mock("firebase/messaging", () => ({
+  getToken: vi.fn(async () => "mock-fcm-token"),
+  onMessage: vi.fn(() => () => {}),
+}));
 
 afterEach(() => {
   resetFirebaseTestState();

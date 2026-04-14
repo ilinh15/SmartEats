@@ -125,6 +125,7 @@ export const firebaseModuleMock = {
   app: { __type: "mock-app" },
   auth: mockAuth,
   db: mockDb,
+  messaging: { __type: "mock-messaging" },
   isFirebaseConfigured: true,
 };
 

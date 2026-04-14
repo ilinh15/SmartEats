@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, FirebaseError } from "firebase/auth";
 import { getAuth } from "firebase/auth";
 import { setDoc, doc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
@@ -87,8 +87,9 @@ const RegisterPage = () => {
 
       // Redirect to preference setup page
       navigate("/preferences");
-    } catch (err: any) {
-      const errorCode = err.code;
+    } catch (err: unknown) {
+      const error = err as FirebaseError;
+      const errorCode = error.code;
       if (errorCode === "auth/email-already-in-use") {
         setError("Email is already in use. Please log in or use a different email.");
       } else if (errorCode === "auth/weak-password") {
@@ -96,7 +97,7 @@ const RegisterPage = () => {
       } else if (errorCode === "auth/invalid-email") {
         setError("Invalid email address.");
       } else {
-        setError(err.message || "Registration failed. Please try again.");
+        setError(error.message || "Registration failed. Please try again.");
       }
     } finally {
       setLoading(false);

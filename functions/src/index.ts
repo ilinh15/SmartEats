@@ -18,6 +18,24 @@ interface GeneratedRecipe {
   imageUrl?: string;
 }
 
+interface GeminiResponse {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        text?: string;
+      }>;
+    };
+  }>;
+}
+
+interface MistralResponse {
+  choices?: Array<{
+    message?: {
+      content?: string;
+    };
+  }>;
+}
+
 const corsHandler = cors({ origin: true });
 
 // Helper to call Gemini API
@@ -53,7 +71,7 @@ async function callGeminiAPI(prompt: string): Promise<string> {
     throw new Error(`Gemini API error: ${response.status} - ${error}`);
   }
 
-  const data = (await response.json()) as any;
+  const data = (await response.json()) as GeminiResponse;
   const textContent = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
   if (!textContent) {
@@ -93,7 +111,7 @@ async function callMistralAPI(prompt: string): Promise<string> {
     throw new Error(`Mistral API error: ${response.status} - ${error}`);
   }
 
-  const data = (await response.json()) as any;
+  const data = (await response.json()) as MistralResponse;
   const textContent = data?.choices?.[0]?.message?.content;
 
   if (!textContent) {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, type User, FirebaseError } from "firebase/auth";
 import { setDoc, doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ const PREFERENCES: PreferenceOption[] = ["Halal", "Economy", "Vegan", "Vegetaria
 
 const PreferencePage = () => {
   const navigate = useNavigate();
-  const [currentUser, setCurrentUser] = useState<any | null>(undefined);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [existingUsername, setExistingUsername] = useState<string | null>(null);
   const [selectedPreferences, setSelectedPreferences] = useState<Set<PreferenceOption>>(new Set());
   const [error, setError] = useState("");
@@ -105,11 +105,12 @@ const PreferencePage = () => {
       sessionStorage.removeItem("newUserEmail");
 
       navigate("/", { replace: true });
-    } catch (err: any) {
-      if (err.code === "permission-denied") {
+    } catch (err: unknown) {
+      const error = err as FirebaseError;
+      if (error.code === "permission-denied") {
         setError("Missing or insufficient permissions. Please make sure Firestore rules allow authenticated users to write to /users/{userId}.");
       } else {
-        setError(err.message || "Failed to save preferences. Please try again.");
+        setError(error.message || "Failed to save preferences. Please try again.");
       }
     } finally {
       setLoading(false);

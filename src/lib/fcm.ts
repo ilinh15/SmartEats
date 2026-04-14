@@ -1,4 +1,4 @@
-import { getToken, onMessage, type Messaging } from 'firebase/messaging';
+import { getToken, onMessage, type Messaging, type MessagePayload } from 'firebase/messaging';
 import { messaging } from './firebase';
 
 export const requestPermission = async (): Promise<string | null> => {
@@ -30,7 +30,7 @@ export const requestPermission = async (): Promise<string | null> => {
   }
 };
 
-export const onMessageListener = (callback: (payload: any) => void) => {
+export const onMessageListener = (callback: (payload: MessagePayload) => void) => {
   if (!messaging) {
     console.error('Firebase messaging is not initialized');
     return () => {};
