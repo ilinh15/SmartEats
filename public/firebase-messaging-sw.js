@@ -2,12 +2,12 @@ importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js'
 importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js');
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY", // Replace with actual value
-  authDomain: "YOUR_AUTH_DOMAIN", // Replace with actual value
-  projectId: "YOUR_PROJECT_ID", // Replace with actual value
-  storageBucket: "YOUR_STORAGE_BUCKET", // Replace with actual value
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID", // Replace with actual value
-  appId: "YOUR_APP_ID" // Replace with actual value
+  apiKey: "AIzaSyB7T5DVELRlllDsPVDQITjrUMy3faFr_x0",
+  authDomain: "smarteats-d9697.firebaseapp.com",
+  projectId: "smarteats-d9697",
+  storageBucket: "smarteats-d9697.firebasestorage.app",
+  messagingSenderId: "470269386658",
+  appId: "1:470269386658:web:d58ff495848ac090b71cfb"
 };
 
 firebase.initializeApp(firebaseConfig);
@@ -20,7 +20,10 @@ messaging.onBackgroundMessage((payload) => {
   const notificationTitle = payload.notification.title;
   const notificationOptions = {
     body: payload.notification.body,
-    icon: '/favicon.ico'
+    icon: 'https://cdn.creativefabrica.com/2020/02/11/Food-Logo-Graphics-1-71-580x386.jpg',
+    badge: 'https://cdn.creativefabrica.com/2020/02/11/Food-Logo-Graphics-1-71-580x386.jpg',
+    tag: 'smarteats-notification',
+    requireInteraction: false
   };
 
   self.registration.showNotification(notificationTitle, notificationOptions);

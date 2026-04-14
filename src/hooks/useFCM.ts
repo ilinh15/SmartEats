@@ -4,27 +4,45 @@ import { requestPermission, onMessageListener } from '../lib/fcm';
 export const useFCM = () => {
   const [token, setToken] = useState<string | null>(null);
   const [permissionGranted, setPermissionGranted] = useState(false);
+  const [status, setStatus] = useState('Initializing notifications...');
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const initFCM = async () => {
-      const fcmToken = await requestPermission();
-      if (fcmToken) {
-        setToken(fcmToken);
-        setPermissionGranted(true);
+      if (!('serviceWorker' in navigator)) {
+        setStatus('Service Worker not supported in this browser');
+        return;
+      }
+
+      try {
+        setStatus('Registering service worker...');
+        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+        setStatus('Service Worker registered');
+
+        const fcmToken = await requestPermission(registration);
+        if (fcmToken) {
+          setToken(fcmToken);
+          setPermissionGranted(true);
+          setStatus('Notification permission granted and token acquired');
+        } else {
+          setStatus('Token not acquired or permission denied');
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        setError(message);
+        setStatus('FCM initialization failed');
+        console.error('FCM init error', err);
       }
     };
 
     initFCM();
 
-    // Listen for foreground messages
     const unsubscribe = onMessageListener((payload) => {
-      // Handle foreground message, e.g., show a toast or custom notification
       console.log('Foreground message:', payload);
-      // You can use your toast system here
     });
 
     return unsubscribe;
   }, []);
 
-  return { token, permissionGranted };
+  return { token, permissionGranted, status, error };
 };

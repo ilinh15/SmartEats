@@ -9,16 +9,21 @@ export const requestPermission = async (): Promise<string | null> => {
 
   try {
     const permission = await Notification.requestPermission();
-    if (permission === 'granted') {
-      const token = await getToken(messaging, {
-        vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY, // You'll need to add this to your env
-      });
-      console.log('FCM Token:', token);
-      return token;
-    } else {
+    if (permission !== 'granted') {
       console.log('Notification permission denied');
       return null;
     }
+
+    const registration = await navigator.serviceWorker.ready;
+    console.log('Service worker ready for FCM:', registration.scope);
+
+    const token = await getToken(messaging, {
+      vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY,
+      serviceWorkerRegistration: registration,
+    });
+
+    console.log('FCM Token:', token);
+    return token;
   } catch (error) {
     console.error('Error getting FCM token:', error);
     return null;
