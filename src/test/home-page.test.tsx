@@ -6,7 +6,6 @@ import HomePage from "@/pages/HomePage";
 import { listCookingRecommendations } from "@/lib/cookingRecommendations";
 import { getCurrentPosition } from "@/lib/geolocation";
 import { getMealTimeContent } from "@/lib/mealTime";
-import { searchMealRecommendations, searchNearbyPlaces } from "@/lib/nearbyPlaces";
 
 vi.mock("@/lib/geolocation", () => ({
   getCurrentPosition: vi.fn(),
@@ -14,11 +13,6 @@ vi.mock("@/lib/geolocation", () => ({
 
 vi.mock("@/lib/mealTime", () => ({
   getMealTimeContent: vi.fn(),
-}));
-
-vi.mock("@/lib/nearbyPlaces", () => ({
-  searchMealRecommendations: vi.fn(),
-  searchNearbyPlaces: vi.fn(),
 }));
 
 vi.mock("@/lib/cookingRecommendations", async () => {
@@ -32,8 +26,6 @@ vi.mock("@/lib/cookingRecommendations", async () => {
 
 const mockedGetCurrentPosition = vi.mocked(getCurrentPosition);
 const mockedGetMealTimeContent = vi.mocked(getMealTimeContent);
-const mockedSearchMealRecommendations = vi.mocked(searchMealRecommendations);
-const mockedSearchNearbyPlaces = vi.mocked(searchNearbyPlaces);
 const mockedListCookingRecommendations = vi.mocked(listCookingRecommendations);
 
 const sampleRecommendation = {
@@ -66,32 +58,6 @@ const sampleSupperRecommendation = {
   mealType: "supper" as const,
 };
 
-const sampleRestaurantRecommendation = {
-  id: "breakfast-corner",
-  name: "Breakfast Corner",
-  imageUrl: null,
-  photoAttributions: [],
-  distanceText: "0.6 km",
-  rating: 4.5,
-  address: "Serangoon Road, Singapore",
-  primaryType: "Cafe",
-  isOpenNow: true,
-  mapsUrl: "https://maps.google.com/?cid=breakfast-corner",
-};
-
-const sampleNearby = {
-  id: "maxwell-food-centre",
-  name: "Maxwell Food Centre",
-  imageUrl: null,
-  photoAttributions: [],
-  distanceText: "0.7 km",
-  rating: 4.6,
-  address: "Kadayanallur Street, Singapore",
-  primaryType: "Food Court",
-  isOpenNow: true,
-  mapsUrl: "https://maps.google.com/?cid=maxwell-food-centre",
-};
-
 const renderHomePage = () => {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -120,8 +86,6 @@ describe("HomePage time-based recommendations", () => {
   beforeEach(() => {
     mockedGetCurrentPosition.mockReset();
     mockedGetMealTimeContent.mockReset();
-    mockedSearchMealRecommendations.mockReset();
-    mockedSearchNearbyPlaces.mockReset();
     mockedListCookingRecommendations.mockReset();
   });
 
@@ -129,7 +93,7 @@ describe("HomePage time-based recommendations", () => {
     cleanup();
   });
 
-  it("shows breakfast cooking recommendations in the morning and fetches breakfast results", async () => {
+  it("shows breakfast cooking recommendations in the morning", async () => {
     mockedGetMealTimeContent.mockReturnValue({
       greeting: "Good morning",
       heroSuggestion: "Time for a bright breakfast nearby?",
@@ -137,17 +101,13 @@ describe("HomePage time-based recommendations", () => {
       mealLabel: "Breakfast",
       mealSearchQuery: "best breakfast cafes and food stalls",
     });
-    mockedGetCurrentPosition.mockResolvedValue({ lat: 1.3, lng: 103.85 });
-    mockedSearchMealRecommendations.mockResolvedValue([sampleRestaurantRecommendation]);
-    mockedSearchNearbyPlaces.mockResolvedValue([sampleNearby]);
+    mockedGetCurrentPosition.mockRejectedValue({ code: 1, message: "User denied Geolocation" });
     mockedListCookingRecommendations.mockResolvedValue([sampleRecommendation]);
 
     renderHomePage();
 
     expect(await screen.findByText(/recommend to cook today/i)).toBeInTheDocument();
     expect(await screen.findByText("Tamago Sando")).toBeInTheDocument();
-    expect(await screen.findByText(/breakfast picks for you/i)).toBeInTheDocument();
-    expect(await screen.findByText("Breakfast Corner")).toBeInTheDocument();
 
     await waitFor(() => {
       expect(mockedListCookingRecommendations).toHaveBeenCalledWith({
@@ -248,11 +208,9 @@ describe("HomePage time-based recommendations", () => {
 
     expect(await screen.findAllByText(/allow location access to load time-based nearby food picks/i)).toHaveLength(2);
     expect(await screen.findByText("Tamago Sando")).toBeInTheDocument();
-    expect(mockedSearchMealRecommendations).not.toHaveBeenCalled();
-    expect(mockedSearchNearbyPlaces).not.toHaveBeenCalled();
   });
 
-  it("switches to supper recommendations late at night", async () => {
+  it("switches to supper cooking recommendations late at night", async () => {
     mockedGetMealTimeContent.mockReturnValue({
       greeting: "Good evening",
       heroSuggestion: "Looking for a light supper nearby?",
@@ -260,14 +218,11 @@ describe("HomePage time-based recommendations", () => {
       mealLabel: "Supper",
       mealSearchQuery: "best supper food stalls and late-night cafes",
     });
-    mockedGetCurrentPosition.mockResolvedValue({ lat: 1.31, lng: 103.86 });
-    mockedSearchMealRecommendations.mockResolvedValue([sampleRestaurantRecommendation]);
-    mockedSearchNearbyPlaces.mockResolvedValue([sampleNearby]);
+    mockedGetCurrentPosition.mockRejectedValue({ code: 1, message: "User denied Geolocation" });
     mockedListCookingRecommendations.mockResolvedValue([sampleSupperRecommendation]);
 
     renderHomePage();
 
-    expect(await screen.findByText(/nearby supper picks for you/i)).toBeInTheDocument();
     expect(await screen.findByText("Ochazuke Bowl")).toBeInTheDocument();
 
     await waitFor(() => {

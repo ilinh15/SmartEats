@@ -6,7 +6,6 @@ import App from "@/App";
 import Index from "@/pages/Index";
 import { getCurrentPosition } from "@/lib/geolocation";
 import { getMealTimeContent } from "@/lib/mealTime";
-import { searchMealRecommendations, searchNearbyPlaces } from "@/lib/nearbyPlaces";
 import { createSavedRecipeFromGeneratedRecipe } from "@/lib/recipeFavorites";
 import { generateRecipeWithGemini } from "@/lib/recipeGeneration";
 import { getFirestoreDocument } from "./firebaseTestUtils";
@@ -19,21 +18,12 @@ vi.mock("@/lib/mealTime", () => ({
   getMealTimeContent: vi.fn(),
 }));
 
-vi.mock("@/lib/nearbyPlaces", () => ({
-  nearbyFilters: ["All", "Restaurant", "Takeaway", "Cafe", "Food Court", "Open Now"],
-  searchMealRecommendations: vi.fn(),
-  searchNearbyPlaces: vi.fn(),
-  searchPlacesByArea: vi.fn(),
-}));
-
 vi.mock("@/lib/recipeGeneration", () => ({
   generateRecipeWithGemini: vi.fn(),
 }));
 
 const mockedGetCurrentPosition = vi.mocked(getCurrentPosition);
 const mockedGetMealTimeContent = vi.mocked(getMealTimeContent);
-const mockedSearchMealRecommendations = vi.mocked(searchMealRecommendations);
-const mockedSearchNearbyPlaces = vi.mocked(searchNearbyPlaces);
 const mockedGenerateRecipeWithGemini = vi.mocked(generateRecipeWithGemini);
 
 const generatedRecipe = {
@@ -71,8 +61,6 @@ describe("recipe favorites flow", () => {
     window.localStorage.clear();
     mockedGetCurrentPosition.mockReset();
     mockedGetMealTimeContent.mockReset();
-    mockedSearchMealRecommendations.mockReset();
-    mockedSearchNearbyPlaces.mockReset();
     mockedGenerateRecipeWithGemini.mockReset();
 
     mockedGetMealTimeContent.mockReturnValue({
@@ -83,8 +71,6 @@ describe("recipe favorites flow", () => {
       mealSearchQuery: "best breakfast cafes and food stalls",
     });
     mockedGetCurrentPosition.mockRejectedValue({ code: 1, message: "User denied Geolocation" });
-    mockedSearchMealRecommendations.mockResolvedValue([]);
-    mockedSearchNearbyPlaces.mockResolvedValue([]);
     mockedGenerateRecipeWithGemini.mockResolvedValue(generatedRecipe);
   });
 
