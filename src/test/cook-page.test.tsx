@@ -100,4 +100,58 @@ describe("CookPage clear all", () => {
     });
     expect(screen.queryByText(/error generating recipe/i)).not.toBeInTheDocument();
   });
+
+  it("regenerates recommendation results when the cuisine filter changes", async () => {
+    mockedListCookingRecommendations.mockImplementation(async ({ cuisine }) => {
+      if (cuisine === "korean") {
+        return [
+          {
+            id: "kimchi-fried-rice",
+            title: "Kimchi Fried Rice",
+            description: "A spicy Korean rice bowl with kimchi and a runny egg.",
+            cuisine: "korean" as const,
+            mealType: "dinner" as const,
+            cookTimeMinutes: 18,
+            ingredients: ["Rice", "Kimchi", "Egg"],
+            instructions: ["Stir-fry the kimchi.", "Toss in the rice.", "Top with an egg."],
+            imageUrl: null,
+            isRecommended: true,
+            difficulty: "Easy",
+            tags: ["Quick"],
+          },
+        ];
+      }
+
+      return [
+        {
+          id: "tamago-sando",
+          title: "Tamago Sando",
+          description: "Creamy Japanese egg salad tucked into soft milk bread.",
+          cuisine: "japanese" as const,
+          mealType: "breakfast" as const,
+          cookTimeMinutes: 15,
+          ingredients: ["Eggs", "Japanese mayo", "Milk bread"],
+          instructions: ["Boil the eggs.", "Mash with mayo.", "Assemble the sandwich."],
+          imageUrl: null,
+          isRecommended: true,
+          difficulty: "Easy",
+          tags: ["Cafe-style"],
+        },
+      ];
+    });
+
+    renderCookPage();
+
+    expect(await screen.findByText("Tamago Sando")).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Korean" })[1]);
+
+    expect(await screen.findByText("Kimchi Fried Rice")).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(mockedListCookingRecommendations).toHaveBeenLastCalledWith({
+        cuisine: "korean",
+      });
+    });
+  });
 });

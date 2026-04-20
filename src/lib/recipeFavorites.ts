@@ -11,7 +11,7 @@ import { db, isFirebaseConfigured } from "@/lib/firebase";
 import type { GeneratedRecipe } from "@/lib/recipeGeneration";
 
 const FAVORITE_RECIPES_COLLECTION = "favorite_recipes";
-const VALID_CUISINES = new Set(["chinese", "malay", "indian", "japanese", "western"]);
+const VALID_CUISINES = new Set(["chinese", "malay", "indian", "japanese", "korean", "western"]);
 const VALID_MEALS = new Set(["breakfast", "lunch", "dinner", "supper"]);
 const VALID_SOURCES = new Set(["recommendation", "generated"]);
 
@@ -177,7 +177,9 @@ const buildGeneratedRecipeDescription = (
   { selectedCuisine, selectedIngredients }: GeneratedRecipeContext,
 ) => {
   const ingredientSnippet = uniqueStrings(selectedIngredients).slice(0, 3);
-  const cuisineLabel = selectedCuisine.trim() && selectedCuisine !== "All" ? selectedCuisine.trim() : undefined;
+  const normalizedCuisine = selectedCuisine.trim();
+  const cuisineLabel =
+    normalizedCuisine && normalizedCuisine.toLowerCase() !== "all" ? normalizedCuisine : undefined;
   const lead = cuisineLabel ? `AI-generated ${cuisineLabel.toLowerCase()} recipe` : "AI-generated recipe";
   const body =
     ingredientSnippet.length > 0
@@ -193,8 +195,9 @@ export const createSavedRecipeFromGeneratedRecipe = (
   context: GeneratedRecipeContext,
 ): SavedRecipe => {
   const cuisine = toCookingCuisine(context.selectedCuisine.toLowerCase());
+  const normalizedCuisine = context.selectedCuisine.trim();
   const cuisineLabel =
-    context.selectedCuisine.trim() && context.selectedCuisine !== "All" ? context.selectedCuisine.trim() : undefined;
+    normalizedCuisine && normalizedCuisine.toLowerCase() !== "all" ? normalizedCuisine : undefined;
 
   return normalizeSavedRecipe({
     id: createGeneratedRecipeFavoriteId(recipe, context),

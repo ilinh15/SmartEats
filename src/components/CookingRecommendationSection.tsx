@@ -53,7 +53,7 @@ const CookingRecommendationSection = ({
         <h2 className="text-xl font-display font-semibold text-foreground">Recommend to cook today</h2>
         <p className="mt-1 text-sm font-body text-muted-foreground">{SECTION_COPY[mealType]}</p>
         <p className="mt-1 text-xs font-body text-muted-foreground">
-          Based on the time of day, here are some {mealLabel.toLowerCase()} recipes you may like.
+          Based on the time of day, here are some AI-generated {mealLabel.toLowerCase()} recipes you may like.
         </p>
       </div>
 

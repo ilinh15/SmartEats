@@ -5,7 +5,11 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { generateRecipeWithGemini, type GeneratedRecipe } from "@/lib/recipeGeneration";
 import { createSavedRecipeFromGeneratedRecipe, type FavoriteRecipeInput } from "@/lib/recipeFavorites";
-import { listCookingRecommendations, type CookingRecommendation, cookingCuisineFilters } from "@/lib/cookingRecommendations";
+import {
+  listCookingRecommendations,
+  type CookingCuisineFilter,
+  cookingCuisineFilters,
+} from "@/lib/cookingRecommendations";
 import CookingRecommendationCard from "@/components/CookingRecommendationCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -40,26 +44,24 @@ const CookPage = ({
 }: CookPageProps) => {
   const { toast } = useToast();
   const navigate = useNavigate();
-
-  // Query for cooking recommendations from Firebase (no meal type filter)
-  const cookingRecommendationsQuery = useQuery({
-    queryKey: ["cook-page-recommendations"],
-    queryFn: () => listCookingRecommendations({}),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
-
   const [selected, setSelected] = useState<string[]>([]);
   const [ingredientInput, setIngredientInput] = useState("");
   const [showResult, setShowResult] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [generationCuisine, setGenerationCuisine] = useState<"all" | "chinese" | "malay" | "indian" | "japanese" | "western">(
-    "all",
-  );
-  const [recommendationCuisine, setRecommendationCuisine] = useState<"all" | "chinese" | "malay" | "indian" | "japanese" | "western">(
-    "all",
-  );
+  const [generationCuisine, setGenerationCuisine] = useState<CookingCuisineFilter>("all");
+  const [recommendationCuisine, setRecommendationCuisine] = useState<CookingCuisineFilter>("all");
   const [generatedRecipe, setGeneratedRecipe] = useState<GeneratedRecipe | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const cookingRecommendationsQuery = useQuery({
+    queryKey: ["cook-page-recommendations", recommendationCuisine],
+    queryFn: () =>
+      listCookingRecommendations({
+        cuisine: recommendationCuisine === "all" ? undefined : recommendationCuisine,
+      }),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
   const hasCookSessionState = selected.length > 0 || ingredientInput.trim().length > 0 || !!generatedRecipe || !!error;
   const generatedFavoriteRecipe = useMemo(
     () =>
@@ -74,6 +76,9 @@ const CookPage = ({
   const isGeneratedRecipeFavorited = generatedFavoriteRecipe
     ? favoriteRecipeIds.has(generatedFavoriteRecipe.id)
     : false;
+
+  const recommendations = cookingRecommendationsQuery.data ?? [];
+  const isFiltered = recommendationCuisine !== "all";
 
   const toggle = (item: string) => {
     setSelected((prev) =>
@@ -120,16 +125,6 @@ const CookPage = ({
       setLoading(false);
     }
   };
-
-  const filtered = useMemo(() => {
-    const recommendations = cookingRecommendationsQuery.data ?? [];
-    let results = recommendations;
-    if (recommendationCuisine !== "all") {
-      results = results.filter((recipe) => recipe.cuisine === recommendationCuisine);
-    }
-    return results;
-  }, [cookingRecommendationsQuery.data, recommendationCuisine]);
-  const isFiltered = recommendationCuisine !== "all";
 
   return (
     <div className="pb-20 min-h-screen" style={{ background: "var(--hero-gradient)" }}>
@@ -367,7 +362,7 @@ const CookPage = ({
           <div>
             <h2 className="text-xl font-display font-semibold text-foreground">Recipes to cook</h2>
             <p className="mt-1 text-sm font-body text-muted-foreground">
-              Explore our collection of recipes.
+              Explore AI-generated recipe ideas matched to your selected cuisine.
             </p>
           </div>
 
@@ -419,7 +414,7 @@ const CookPage = ({
             </div>
           )}
 
-          {!cookingRecommendationsQuery.isLoading && !cookingRecommendationsQuery.isError && filtered.length === 0 && (
+          {!cookingRecommendationsQuery.isLoading && !cookingRecommendationsQuery.isError && recommendations.length === 0 && (
             <div className="mt-4 rounded-[24px] bg-card p-5 shadow-card">
               <p className="text-sm font-body text-foreground">
                 {isFiltered ? "No recipes found for this cuisine." : "No recipes found right now."}
@@ -430,13 +425,15 @@ const CookPage = ({
             </div>
           )}
 
-          {!cookingRecommendationsQuery.isLoading && !cookingRecommendationsQuery.isError && filtered.length > 0 && (
+          {!cookingRecommendationsQuery.isLoading && !cookingRecommendationsQuery.isError && recommendations.length > 0 && (
             <div className="mt-4 flex flex-col gap-4">
-              {filtered.map((recommendation) => (
+              {recommendations.map((recommendation) => (
                 <CookingRecommendationCard
                   key={recommendation.id}
                   recommendation={recommendation}
-                  isFavorited={favoriteRecipeIds.has(recommendation.id)}                compact                  onSelect={() => navigate(`/recipes/${recommendation.id}`)}
+                  isFavorited={favoriteRecipeIds.has(recommendation.id)}
+                  compact
+                  onSelect={() => navigate(`/recipes/${recommendation.id}`)}
                   onToggleFavorite={onToggleFavoriteRecipe}
                 />
               ))}

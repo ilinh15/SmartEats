@@ -43,11 +43,11 @@ const sampleRecommendation = {
   tags: ["Cafe-style"],
 };
 
-const chineseBreakfastRecommendation = {
+const koreanBreakfastRecommendation = {
   ...sampleRecommendation,
-  id: "congee-morning-bowl",
-  title: "Congee Morning Bowl",
-  cuisine: "chinese" as const,
+  id: "kimchi-egg-toast",
+  title: "Kimchi Egg Toast",
+  cuisine: "korean" as const,
 };
 
 const sampleSupperRecommendation = {
@@ -127,8 +127,8 @@ describe("HomePage time-based recommendations", () => {
     });
     mockedGetCurrentPosition.mockRejectedValue({ code: 1, message: "User denied Geolocation" });
     mockedListCookingRecommendations.mockImplementation(async ({ cuisine }) => {
-      if (cuisine === "chinese") {
-        return [chineseBreakfastRecommendation];
+      if (cuisine === "korean") {
+        return [koreanBreakfastRecommendation];
       }
 
       return [sampleRecommendation];
@@ -138,14 +138,14 @@ describe("HomePage time-based recommendations", () => {
 
     expect(await screen.findByText("Tamago Sando")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /chinese/i }));
+    fireEvent.click(screen.getByRole("button", { name: /korean/i }));
 
-    expect(await screen.findByText("Congee Morning Bowl")).toBeInTheDocument();
+    expect(await screen.findByText("Kimchi Egg Toast")).toBeInTheDocument();
 
     await waitFor(() => {
       expect(mockedListCookingRecommendations).toHaveBeenLastCalledWith({
         mealType: "breakfast",
-        cuisine: "chinese",
+        cuisine: "korean",
       });
     });
   });
