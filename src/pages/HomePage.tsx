@@ -29,6 +29,7 @@ const HomePage = ({
 }: HomePageProps) => {
   const [currentTime, setCurrentTime] = useState(() => new Date());
   const [username, setUsername] = useState("Guest");
+  const [userPreferences, setUserPreferences] = useState<string[]>([]);
   const mealContent = useMemo(() => getMealTimeContent(currentTime), [currentTime]);
 
   useEffect(() => {
@@ -49,13 +50,21 @@ const HomePage = ({
       try {
         const userDoc = await getDoc(doc(db, "users", user.uid));
         if (userDoc.exists()) {
-          setUsername(userDoc.data()?.username || user.displayName || "Guest");
+          const data = userDoc.data();
+          setUsername(data?.username || user.displayName || "Guest");
+          setUserPreferences(
+            Array.isArray(data?.preferences)
+              ? data.preferences.filter((preference): preference is string => typeof preference === "string")
+              : [],
+          );
         } else {
           setUsername(user.displayName || "Guest");
+          setUserPreferences([]);
         }
       } catch (error) {
         console.error("Failed to load username:", error);
         setUsername(user.displayName || "Guest");
+        setUserPreferences([]);
       }
     });
 
@@ -183,6 +192,7 @@ const HomePage = ({
         <CookingRecommendationSection
           mealType={mealContent.mealPeriod}
           favoriteRecipeIds={favoriteRecipeIds}
+          userPreferences={userPreferences}
           onToggleFavoriteRecipe={onToggleFavoriteRecipe}
         />
 

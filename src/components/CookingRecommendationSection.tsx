@@ -15,6 +15,7 @@ import {
 interface CookingRecommendationSectionProps {
   mealType: CookingMealType;
   favoriteRecipeIds: ReadonlySet<string>;
+  userPreferences?: string[];
   onToggleFavoriteRecipe: (recipe: CookingRecommendation) => void;
 }
 
@@ -28,6 +29,7 @@ const SECTION_COPY: Record<CookingMealType, string> = {
 const CookingRecommendationSection = ({
   mealType,
   favoriteRecipeIds,
+  userPreferences = [],
   onToggleFavoriteRecipe,
 }: CookingRecommendationSectionProps) => {
   const [selectedCuisine, setSelectedCuisine] = useState<CookingCuisineFilter>("all");
@@ -35,13 +37,17 @@ const CookingRecommendationSection = ({
   const mealLabel = COOKING_MEAL_LABELS[mealType];
 
   const recommendationsQuery = useQuery({
-    queryKey: ["home-cooking-recommendations", mealType, selectedCuisine],
+    queryKey: ["home-cooking-recommendations", mealType, selectedCuisine, userPreferences.join("|")],
     staleTime: 5 * 60 * 1000,
-    queryFn: () =>
-      listCookingRecommendations({
+    queryFn: () => {
+      const params = {
         mealType,
         cuisine: selectedCuisine === "all" ? undefined : selectedCuisine,
-      }),
+        ...(userPreferences.length > 0 ? { userPreferences } : {}),
+      };
+
+      return listCookingRecommendations(params);
+    },
   });
 
   const recommendations = recommendationsQuery.data ?? [];
@@ -53,7 +59,7 @@ const CookingRecommendationSection = ({
         <h2 className="text-xl font-display font-semibold text-foreground">Recommend to cook today</h2>
         <p className="mt-1 text-sm font-body text-muted-foreground">{SECTION_COPY[mealType]}</p>
         <p className="mt-1 text-xs font-body text-muted-foreground">
-          Based on the time of day, here are some AI-generated {mealLabel.toLowerCase()} recipes you may like.
+          Based on the time of day and your saved preferences, here are some AI-generated {mealLabel.toLowerCase()} recipes you may like.
         </p>
       </div>
 

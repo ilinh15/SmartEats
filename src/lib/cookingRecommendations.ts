@@ -1,4 +1,9 @@
 import { mockCookingRecommendations } from "@/data/cookingRecommendations";
+import {
+  buildPreferenceInstructions,
+  getPreferenceTagLabels,
+  normalizeUserPreferences,
+} from "@/lib/preferenceInstructions";
 import { fetchRecipeImage } from "@/lib/recipeGeneration";
 import type { MealPeriod } from "@/lib/mealTime";
 
@@ -26,6 +31,7 @@ export interface CookingRecommendation {
 export interface GetCookingRecommendationsParams {
   mealType?: CookingMealType;
   cuisine?: CookingCuisine;
+  userPreferences?: string[];
 }
 
 interface RawCookingRecommendation {
@@ -74,7 +80,7 @@ interface MistralResponse {
   }>;
 }
 
-const AI_RECOMMENDATION_CACHE_KEY = "smarteats.ai-cooking-recommendations.v1";
+const AI_RECOMMENDATION_CACHE_KEY = "smarteats.ai-cooking-recommendations.v2";
 const AI_RECOMMENDATION_CACHE_TTL_MS = 30 * 60 * 1000;
 const AI_RECOMMENDATION_COUNT = 6;
 const TEST_MODE = import.meta.env.MODE === "test";
@@ -187,8 +193,13 @@ const buildRecommendationId = ({
   return `${normalizedTitle}-${signature}`;
 };
 
-const buildQueryKey = ({ mealType, cuisine }: GetCookingRecommendationsParams) =>
-  `${mealType ?? "all"}::${cuisine ?? "all"}`;
+const buildQueryKey = ({ mealType, cuisine, userPreferences }: GetCookingRecommendationsParams) => {
+  const preferenceKey = normalizeUserPreferences(userPreferences)
+    .sort()
+    .join("|");
+
+  return `${mealType ?? "all"}::${cuisine ?? "all"}::${preferenceKey || "no-preferences"}`;
+};
 
 const isCacheStale = (generatedAt?: string) => {
   if (!generatedAt) {
@@ -326,13 +337,23 @@ const hasUnsplashKey = () =>
   !!import.meta.env.VITE_UNSPLASH_ACCESS_KEY &&
   import.meta.env.VITE_UNSPLASH_ACCESS_KEY !== "your-unsplash-access-key";
 
-const buildRecommendationPrompt = ({ mealType, cuisine }: GetCookingRecommendationsParams) => {
+export const buildCookingRecommendationPrompt = ({ mealType, cuisine, userPreferences }: GetCookingRecommendationsParams) => {
   const cuisineInstruction = cuisine
     ? `Every recommendation must be ${COOKING_CUISINE_LABELS[cuisine]} cuisine.`
     : `Use a varied mix from these cuisines: ${cookingCuisines.join(", ")}. Include at least 4 different cuisines when possible.`;
   const mealInstruction = mealType
     ? `Every recommendation must suit ${mealType}.`
     : "Mix breakfast, lunch, dinner, and supper ideas naturally across the list.";
+  const preferenceInstructions = buildPreferenceInstructions(userPreferences);
+  const preferenceTagLabels = getPreferenceTagLabels(userPreferences);
+  const preferenceInstruction =
+    preferenceInstructions.length > 0
+      ? [
+          "Selected preference rules are strict and must all be satisfied together:",
+          ...preferenceInstructions.map((instruction) => `- ${instruction}`),
+          `Include matching tags when relevant, especially: ${preferenceTagLabels.join(", ")}.`,
+        ].join("\n")
+      : "No user dietary or budget preferences were provided.";
 
   return `Generate ${AI_RECOMMENDATION_COUNT} SmartEats recipe recommendations as valid JSON.
 
@@ -348,7 +369,7 @@ Return this exact top-level shape:
       "ingredients": ["string", "string", "string"],
       "instructions": ["string", "string", "string"],
       "difficulty": "Easy|Medium|Hard",
-      "tags": ["string", "string"],
+      "tags": ["matching preference tag when relevant", "string"],
       "isRecommended": true
     }
   ]
@@ -364,7 +385,8 @@ Rules:
 - Do not include markdown, code fences, commentary, or explanatory text.
 - Return valid JSON only.
 - ${cuisineInstruction}
-- ${mealInstruction}`;
+- ${mealInstruction}
+${preferenceInstruction}`;
 };
 
 const extractJsonPayload = (responseText: string) => {
@@ -564,7 +586,7 @@ const hydrateRecommendationImages = async (recommendations: CookingRecommendatio
 };
 
 const generateAIRecommendations = async (params: GetCookingRecommendationsParams) => {
-  const prompt = buildRecommendationPrompt(params);
+  const prompt = buildCookingRecommendationPrompt(params);
   const responseJson = await requestRecommendationJson(prompt);
   const payload = extractJsonPayload(responseJson);
 
@@ -588,8 +610,10 @@ export const formatCookTimeMinutes = (minutes: number) => `${minutes} Min`;
 export const listCookingRecommendations = async ({
   mealType,
   cuisine,
+  userPreferences,
 }: GetCookingRecommendationsParams = {}): Promise<CookingRecommendation[]> => {
-  const cachedRecommendations = getCachedRecommendations({ mealType, cuisine });
+  const params = { mealType, cuisine, userPreferences };
+  const cachedRecommendations = getCachedRecommendations(params);
 
   if (cachedRecommendations) {
     return cachedRecommendations;
@@ -597,16 +621,16 @@ export const listCookingRecommendations = async ({
 
   if (TEST_MODE) {
     const fallbackRecommendations = filterRecommendations(mockCookingRecommendations, { mealType, cuisine });
-    cacheRecommendations({ mealType, cuisine }, fallbackRecommendations);
+    cacheRecommendations(params, fallbackRecommendations);
     return fallbackRecommendations;
   }
 
   const generatedRecommendations = filterRecommendations(
-    await generateAIRecommendations({ mealType, cuisine }),
+    await generateAIRecommendations(params),
     { mealType, cuisine },
   );
 
-  cacheRecommendations({ mealType, cuisine }, generatedRecommendations);
+  cacheRecommendations(params, generatedRecommendations);
   return generatedRecommendations;
 };
 

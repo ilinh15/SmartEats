@@ -1,8 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertCircle, ChefHat, Clock, Heart, Users, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
 import { generateRecipeWithGemini, type GeneratedRecipe } from "@/lib/recipeGeneration";
 import { createSavedRecipeFromGeneratedRecipe, type FavoriteRecipeInput } from "@/lib/recipeFavorites";
 import {
@@ -10,6 +12,7 @@ import {
   type CookingCuisineFilter,
   cookingCuisineFilters,
 } from "@/lib/cookingRecommendations";
+import { auth, db } from "@/lib/firebase";
 import CookingRecommendationCard from "@/components/CookingRecommendationCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -51,14 +54,49 @@ const CookPage = ({
   const [generationCuisine, setGenerationCuisine] = useState<CookingCuisineFilter>("all");
   const [recommendationCuisine, setRecommendationCuisine] = useState<CookingCuisineFilter>("all");
   const [generatedRecipe, setGeneratedRecipe] = useState<GeneratedRecipe | null>(null);
+  const [userPreferences, setUserPreferences] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!db) {
+      setUserPreferences([]);
+      return undefined;
+    }
+
+    const authClient = auth || getAuth();
+    const unsubscribe = onAuthStateChanged(authClient, async (user) => {
+      if (!user) {
+        setUserPreferences([]);
+        return;
+      }
+
+      try {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        const preferences = userDoc.exists() ? userDoc.data()?.preferences : [];
+        setUserPreferences(
+          Array.isArray(preferences)
+            ? preferences.filter((preference): preference is string => typeof preference === "string")
+            : [],
+        );
+      } catch (preferenceError) {
+        console.error("Failed to load cooking preferences:", preferenceError);
+        setUserPreferences([]);
+      }
+    });
+
+    return unsubscribe;
+  }, []);
+
   const cookingRecommendationsQuery = useQuery({
-    queryKey: ["cook-page-recommendations", recommendationCuisine],
-    queryFn: () =>
-      listCookingRecommendations({
+    queryKey: ["cook-page-recommendations", recommendationCuisine, userPreferences.join("|")],
+    queryFn: () => {
+      const params = {
         cuisine: recommendationCuisine === "all" ? undefined : recommendationCuisine,
-      }),
+        ...(userPreferences.length > 0 ? { userPreferences } : {}),
+      };
+
+      return listCookingRecommendations(params);
+    },
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
@@ -110,7 +148,9 @@ const CookPage = ({
     setError(null);
     try {
       const cuisine = generationCuisine === "all" ? "" : generationCuisine;
-      const recipe = await generateRecipeWithGemini(selected, cuisine);
+      const recipe = await generateRecipeWithGemini(selected, cuisine, {
+        userPreferences,
+      });
       setGeneratedRecipe(recipe);
       setShowResult(true);
     } catch (err) {
