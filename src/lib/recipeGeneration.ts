@@ -226,7 +226,7 @@ export async function generateRecipeWithGemini(
     if (!recipeJson && hasGeminiKey) {
       // Use Gemini API as fallback
       const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      let geminiModel = import.meta.env.VITE_GEMINI_MODEL || "gemini-2.5-flash";
+      let geminiModel = import.meta.env.VITE_GEMINI_MODEL || "gemini-3.6-flash";
       
       // Normalize model name to lowercase (API expects lowercase)
       geminiModel = geminiModel.toLowerCase().trim();
@@ -251,7 +251,7 @@ export async function generateRecipeWithGemini(
             ],
             generationConfig: {
               temperature: 0.7,
-              maxOutputTokens: 1000,
+              maxOutputTokens: 8192,
               responseMimeType: "application/json",
             },
           }),

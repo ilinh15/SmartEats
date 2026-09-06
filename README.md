@@ -36,7 +36,7 @@ Optional AI recipe generation variables in `.env`:
 
 ```bash
 VITE_GEMINI_API_KEY=your_gemini_api_key
-VITE_GEMINI_MODEL=
+VITE_GEMINI_MODEL=gemini-3.6-flash
 VITE_MISTRAL_API_KEY=your_mistral_api_key
 VITE_MISTRAL_MODEL=mistral-small-latest
 ```

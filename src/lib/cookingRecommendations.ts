@@ -466,7 +466,7 @@ const requestRecommendationJson = async (prompt: string) => {
 
   if (!responseJson && hasGeminiKey()) {
     const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    const geminiModel = String(import.meta.env.VITE_GEMINI_MODEL || "gemini-2.5-flash").toLowerCase().trim();
+    const geminiModel = String(import.meta.env.VITE_GEMINI_MODEL || "gemini-3.6-flash").toLowerCase().trim();
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`,
       {
@@ -487,7 +487,7 @@ const requestRecommendationJson = async (prompt: string) => {
           ],
           generationConfig: {
             temperature: 0.8,
-            maxOutputTokens: 1800,
+            maxOutputTokens: 8192,
             responseMimeType: "application/json",
           },
         }),
@@ -625,10 +625,17 @@ export const listCookingRecommendations = async ({
     return fallbackRecommendations;
   }
 
-  const generatedRecommendations = filterRecommendations(
-    await generateAIRecommendations(params),
-    { mealType, cuisine },
-  );
+  let generatedRecommendations: CookingRecommendation[];
+
+  try {
+    generatedRecommendations = filterRecommendations(
+      await generateAIRecommendations(params),
+      { mealType, cuisine },
+    );
+  } catch (error) {
+    console.warn("AI cooking recommendations unavailable, using built-in recipes:", error);
+    generatedRecommendations = filterRecommendations(mockCookingRecommendations, { mealType, cuisine });
+  }
 
   cacheRecommendations(params, generatedRecommendations);
   return generatedRecommendations;
