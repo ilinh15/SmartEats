@@ -114,7 +114,7 @@ Recommended fields for `favorite_restaurants`:
   "distanceText": "0.6 km",
   "rating": 4.5,
   "primaryType": "Cafe",
-  "mapsUrl": "https://maps.google.com/?cid=breakfast-corner",
+  "mapsUrl": "https://www.openstreetmap.org/node/42",
   "isOpenNow": true,
   "savedAt": "2026-04-12T10:00:00.000Z"
 }

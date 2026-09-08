@@ -147,11 +147,8 @@ const HomePage = ({
     if (error) {
       return (
         <div className="bg-card rounded-[20px] shadow-card p-5">
-          <p className="text-sm font-body text-foreground">Could not load live restaurant recommendations right now.</p>
-          <p className="text-xs font-body text-muted-foreground mt-1">
-            {error.message.includes("VITE_GOOGLE_MAPS_API_KEY")
-              ? "Add VITE_GOOGLE_MAPS_API_KEY to enable Google Places results."
-              : error.message}
+          <p className="text-sm font-body text-foreground">
+            Nearby search is temporarily unavailable. Please try again.
           </p>
         </div>
       );
@@ -163,21 +160,31 @@ const HomePage = ({
 
     return (
       <div className="flex flex-col gap-3">
-        {places.map((place) => (
-          <RestaurantCard
-            key={place.id}
-            address={place.address}
-            badges={[place.primaryType, place.isOpenNow ? "Open Now" : null].filter(Boolean) as string[]}
-            distance={place.distanceText}
-            imageUrl={place.imageUrl}
-            isFavorited={favoriteRestaurantIds.has(place.id)}
-            mapsUrl={place.mapsUrl}
-            name={place.name}
-            onToggleFavorite={() => onToggleFavoriteRestaurant(place)}
-            photoAttributions={place.photoAttributions}
-            rating={place.rating}
-          />
-        ))}
+        <div className="flex flex-col gap-3">
+          {places.map((place) => (
+            <RestaurantCard
+              key={place.id}
+              address={place.address}
+              badges={[place.primaryType, place.isOpenNow ? "Open Now" : null].filter(Boolean) as string[]}
+              distance={place.distanceText}
+              imageUrl={place.imageUrl}
+              isFavorited={favoriteRestaurantIds.has(place.id)}
+              mapsUrl={place.mapsUrl}
+              name={place.name}
+              onToggleFavorite={() => onToggleFavoriteRestaurant(place)}
+              photoAttributions={place.photoAttributions}
+              rating={place.rating}
+            />
+          ))}
+        </div>
+        <a
+          href="https://www.openstreetmap.org/copyright"
+          target="_blank"
+          rel="noreferrer"
+          className="text-[10px] font-body text-muted-foreground underline underline-offset-2"
+        >
+          © OpenStreetMap contributors
+        </a>
       </div>
     );
   };

@@ -225,11 +225,8 @@ const NearbyPage = ({ favoriteRestaurantIds, onToggleFavoriteRestaurant }: Nearb
 
           {placesQuery.isError && (
             <div className="bg-card rounded-[20px] shadow-card p-5">
-              <p className="text-sm font-body text-foreground">Could not load nearby places right now.</p>
-              <p className="text-xs font-body text-muted-foreground mt-1">
-                {(placesQuery.error as Error).message.includes("VITE_GOOGLE_MAPS_API_KEY")
-                  ? "Add VITE_GOOGLE_MAPS_API_KEY to your environment to enable Google Places."
-                  : (placesQuery.error as Error).message}
+              <p className="text-sm font-body text-foreground">
+                Nearby search is temporarily unavailable. Please try again.
               </p>
             </div>
           )}
@@ -261,6 +258,17 @@ const NearbyPage = ({ favoriteRestaurantIds, onToggleFavoriteRestaurant }: Nearb
                 </motion.div>
               );
             })}
+
+          {!placesQuery.isLoading && !placesQuery.isError && places.length > 0 && (
+            <a
+              href="https://www.openstreetmap.org/copyright"
+              target="_blank"
+              rel="noreferrer"
+              className="text-[10px] font-body text-muted-foreground underline underline-offset-2"
+            >
+              © OpenStreetMap contributors
+            </a>
+          )}
 
           {!placesQuery.isLoading && !placesQuery.isError && searchMode !== "idle" && places.length === 0 && (
             <p className="text-center text-muted-foreground font-body py-12 text-sm">{emptyStateMessage}</p>

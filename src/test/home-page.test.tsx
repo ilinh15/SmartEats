@@ -6,6 +6,7 @@ import HomePage from "@/pages/HomePage";
 import { listCookingRecommendations } from "@/lib/cookingRecommendations";
 import { getCurrentPosition } from "@/lib/geolocation";
 import { getMealTimeContent } from "@/lib/mealTime";
+import { searchMealRecommendations, searchNearbyPlaces } from "@/lib/nearbyPlaces";
 
 vi.mock("@/lib/geolocation", () => ({
   getCurrentPosition: vi.fn(),
@@ -24,9 +25,29 @@ vi.mock("@/lib/cookingRecommendations", async () => {
   };
 });
 
+vi.mock("@/lib/nearbyPlaces", () => ({
+  searchMealRecommendations: vi.fn(),
+  searchNearbyPlaces: vi.fn(),
+}));
+
 const mockedGetCurrentPosition = vi.mocked(getCurrentPosition);
 const mockedGetMealTimeContent = vi.mocked(getMealTimeContent);
 const mockedListCookingRecommendations = vi.mocked(listCookingRecommendations);
+const mockedSearchMealRecommendations = vi.mocked(searchMealRecommendations);
+const mockedSearchNearbyPlaces = vi.mocked(searchNearbyPlaces);
+
+const openStreetMapPlace = {
+  id: "node/42",
+  name: "Kampung Cafe",
+  imageUrl: null,
+  photoAttributions: [],
+  distanceText: "250 m",
+  rating: null,
+  address: "42 Jalan Kampung",
+  primaryType: "Cafe",
+  isOpenNow: true,
+  mapsUrl: "https://www.openstreetmap.org/node/42",
+};
 
 const sampleRecommendation = {
   id: "tamago-sando",
@@ -87,6 +108,8 @@ describe("HomePage time-based recommendations", () => {
     mockedGetCurrentPosition.mockReset();
     mockedGetMealTimeContent.mockReset();
     mockedListCookingRecommendations.mockReset();
+    mockedSearchMealRecommendations.mockReset();
+    mockedSearchNearbyPlaces.mockReset();
   });
 
   afterEach(() => {
@@ -208,6 +231,34 @@ describe("HomePage time-based recommendations", () => {
 
     expect(await screen.findAllByText(/allow location access to load time-based nearby food picks/i)).toHaveLength(2);
     expect(await screen.findByText("Tamago Sando")).toBeInTheDocument();
+  });
+
+  it("credits OpenStreetMap for successful nearby results", async () => {
+    mockedGetMealTimeContent.mockReturnValue({
+      greeting: "Good afternoon",
+      heroSuggestion: "Need a good lunch spot around you?",
+      mealPeriod: "lunch",
+      mealLabel: "Lunch",
+      mealSearchQuery: "best lunch restaurants and food stalls",
+    });
+    mockedGetCurrentPosition.mockResolvedValue({ lat: 1.3521, lng: 103.8198 });
+    mockedListCookingRecommendations.mockResolvedValue([]);
+    mockedSearchMealRecommendations.mockResolvedValue([]);
+    mockedSearchNearbyPlaces.mockResolvedValue([openStreetMapPlace]);
+
+    renderHomePage();
+
+    expect(await screen.findByText("Kampung Cafe")).toBeInTheDocument();
+    expect(screen.getByText("No photo")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "© OpenStreetMap contributors" })).toHaveAttribute(
+      "href",
+      "https://www.openstreetmap.org/copyright",
+    );
+    expect(screen.getByRole("link", { name: "Open in OpenStreetMap" })).toHaveAttribute(
+      "href",
+      "https://www.openstreetmap.org/node/42",
+    );
+    expect(screen.queryByText(/google places/i)).not.toBeInTheDocument();
   });
 
   it("switches to supper cooking recommendations late at night", async () => {

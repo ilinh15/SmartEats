@@ -28,7 +28,7 @@ const RestaurantCard = ({
   distance,
   image,
   imageUrl,
-  mapsLabel = "Open in Google Maps",
+  mapsLabel = "Open in OpenStreetMap",
   mapsUrl,
   photoAttributions,
   rating,
