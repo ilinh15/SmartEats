@@ -82,13 +82,21 @@ const buildOverpassQuery = (params: SearchOpenStreetMapPlacesParams) => {
   return `[out:json][timeout:25];nwr["amenity"~"^(${amenities})$"](around:${params.radius},${params.lat},${params.lng});out center tags;`;
 };
 
-const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs: number): Promise<Response> => {
+const fetchWithTimeout = async <T>(
+  url: string,
+  options: RequestInit,
+  timeoutMs: number,
+  consumeResponse: (response: Response) => Promise<T>,
+): Promise<T> => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, { ...options, signal: controller.signal });
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    return await consumeResponse(response);
   } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") throw new Error("OpenStreetMap place search timed out.");
+    if (controller.signal.aborted || (error instanceof DOMException && error.name === "AbortError")) {
+      throw new Error("OpenStreetMap place search timed out.");
+    }
     throw error;
   } finally {
     clearTimeout(timeout);
@@ -118,18 +126,20 @@ export async function searchOpenStreetMapPlaces(params: SearchOpenStreetMapPlace
   validateSearchBounds(params);
   const cached = readCachedPlaces(params);
   if (cached) return cached;
-  const response = await fetchWithTimeout(OVERPASS_ENDPOINT, {
+  const payload = await fetchWithTimeout(OVERPASS_ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
     body: new URLSearchParams({ data: buildOverpassQuery(params) }),
-  }, REQUEST_TIMEOUT_MS);
-  if (!response.ok) throw overpassHttpError(response.status);
-  let payload: OverpassResponse;
-  try {
-    payload = await response.json() as OverpassResponse;
-  } catch {
-    throw new Error("OpenStreetMap place search returned an invalid response.");
-  }
+  }, REQUEST_TIMEOUT_MS, async (response) => {
+    if (!response.ok) throw overpassHttpError(response.status);
+
+    try {
+      return await response.json() as OverpassResponse;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") throw error;
+      throw new Error("OpenStreetMap place search returned an invalid response.");
+    }
+  });
   if (!Array.isArray(payload.elements)) throw new Error("OpenStreetMap place search returned an invalid response.");
   const places = payload.elements.map(normalizeElement).filter((place): place is OpenStreetMapPlace => place !== null);
   cachePlaces(params, places);

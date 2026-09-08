@@ -54,13 +54,18 @@ const waitForNominatimSlot = () => {
   return slot;
 };
 
-const fetchWithTimeout = async (url: string, timeoutMs: number): Promise<Response> => {
+const fetchWithTimeout = async <T>(
+  url: string,
+  timeoutMs: number,
+  consumeResponse: (response: Response) => Promise<T>,
+): Promise<T> => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, { signal: controller.signal });
+    const response = await fetch(url, { signal: controller.signal });
+    return await consumeResponse(response);
   } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
+    if (controller.signal.aborted || (error instanceof DOMException && error.name === "AbortError")) {
       throw new Error("OpenStreetMap geocoding timed out.");
     }
     throw error;
@@ -89,10 +94,12 @@ export async function geocodeArea(textQuery: string): Promise<GeocodedArea | nul
     limit: "1",
     "accept-language": "en",
   }).toString();
-  const response = await fetchWithTimeout(url.toString(), REQUEST_TIMEOUT_MS);
-  if (!response.ok) throw nominatimHttpError(response.status);
+  const results = await fetchWithTimeout(url.toString(), REQUEST_TIMEOUT_MS, async (response) => {
+    if (!response.ok) throw nominatimHttpError(response.status);
+    return await response.json() as NominatimResult[];
+  });
 
-  const [first] = await response.json() as NominatimResult[];
+  const [first] = results;
   if (!first) return null;
   const result = { lat: Number(first.lat), lng: Number(first.lon), displayName: first.display_name };
   if (!Number.isFinite(result.lat) || !Number.isFinite(result.lng)) {

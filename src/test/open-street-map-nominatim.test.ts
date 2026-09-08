@@ -83,6 +83,29 @@ describe("geocodeArea", () => {
     await expectation;
   });
 
+  it("keeps the timeout active while consuming the response body", async () => {
+    let requestSignal: AbortSignal | undefined;
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, options?: RequestInit) => {
+      requestSignal = options?.signal ?? undefined;
+
+      return {
+        ok: true,
+        status: 200,
+        json: () => new Promise((_resolve, reject) => {
+          requestSignal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+        }),
+      } as Response;
+    }));
+    const { geocodeArea } = await import("@/lib/openStreetMapNominatim");
+
+    const result = geocodeArea("Singapore");
+    const expectation = expect(result).rejects.toThrow("OpenStreetMap geocoding timed out.");
+    await vi.advanceTimersByTimeAsync(8_000);
+
+    expect(requestSignal?.aborted).toBe(true);
+    await expectation;
+  });
+
   it("rejects invalid coordinates", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify([
       { lat: "unknown", lon: "103.8", display_name: "Singapore" },

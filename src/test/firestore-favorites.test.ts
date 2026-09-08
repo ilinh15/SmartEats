@@ -26,6 +26,14 @@ const sampleRestaurant: NearbyPlace = {
   mapsUrl: "https://maps.google.com/?cid=rest-1",
 };
 
+const openStreetMapRestaurant: NearbyPlace = {
+  ...sampleRestaurant,
+  id: "node/42",
+  name: "Kampung Cafe",
+  address: "42 Jalan Kampung",
+  mapsUrl: "https://www.openstreetmap.org/node/42",
+};
+
 const sampleRecipe: CookingRecommendation = {
   id: "tamago-sando",
   title: "Tamago Sando",
@@ -88,6 +96,22 @@ describe("Firestore favorites repositories", () => {
     await toggleFavoriteRestaurant("user-a", sampleRestaurant);
 
     expect(getFirestoreDocument("users/user-a/favorite_restaurants/rest-1")).toBeNull();
+  });
+
+  it("saves, reloads, and removes an OpenStreetMap restaurant whose ID contains a slash", async () => {
+    await toggleFavoriteRestaurant("user-a", openStreetMapRestaurant);
+
+    expect(getFirestoreDocument("users/user-a/favorite_restaurants/node%2F42")).toMatchObject({
+      id: "node/42",
+      name: "Kampung Cafe",
+    });
+    await expect(loadFavoriteRestaurants("user-a")).resolves.toMatchObject([
+      { id: "node/42", name: "Kampung Cafe" },
+    ]);
+
+    await toggleFavoriteRestaurant("user-a", openStreetMapRestaurant);
+
+    expect(getFirestoreDocument("users/user-a/favorite_restaurants/node%2F42")).toBeNull();
   });
 
   it("loads only the signed-in user's recipe favorites", async () => {

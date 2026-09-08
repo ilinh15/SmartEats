@@ -80,6 +80,30 @@ describe("searchOpenStreetMapPlaces", () => {
     await expectation;
   });
 
+  it("keeps the timeout active while consuming the response body", async () => {
+    vi.useFakeTimers();
+    let requestSignal: AbortSignal | undefined;
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, options?: RequestInit) => {
+      requestSignal = options?.signal ?? undefined;
+
+      return {
+        ok: true,
+        status: 200,
+        json: () => new Promise((_resolve, reject) => {
+          requestSignal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+        }),
+      } as Response;
+    }));
+    const { searchOpenStreetMapPlaces } = await import("@/lib/openStreetMapOverpass");
+
+    const result = searchOpenStreetMapPlaces({ lat: 1, lng: 2, radius: 100, amenities: ["cafe"] });
+    const expectation = expect(result).rejects.toThrow("OpenStreetMap place search timed out.");
+    await vi.advanceTimersByTimeAsync(12_000);
+
+    expect(requestSignal?.aborted).toBe(true);
+    await expectation;
+  });
+
   it.each([
     [{ lat: -91, lng: 2, radius: 100, amenities: ["cafe"] }, "latitude"],
     [{ lat: 1, lng: 181, radius: 100, amenities: ["cafe"] }, "longitude"],

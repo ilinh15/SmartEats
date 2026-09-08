@@ -4,7 +4,7 @@ import { CalendarDays, Heart, Plus, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import CookingRecommendationCard from "@/components/CookingRecommendationCard";
-import RestaurantCard from "@/components/RestaurantCard";
+import RestaurantCard, { isOpenStreetMapUrl } from "@/components/RestaurantCard";
 import type { NearbyPlace } from "@/lib/nearbyPlaces";
 import { getUserMealPlanner, updateUserMealPlanner, type MealPlanner } from "@/lib/authUtils";
 import type { FavoriteRecipeInput, SavedRecipe } from "@/lib/recipeFavorites";
@@ -58,6 +58,9 @@ const FavoritesPage = ({
   const { toast } = useToast();
   const tabs = ["Recipes", `Restaurants (${favoriteRestaurants.length})`, "Planner"];
   const navigate = useNavigate();
+  const hasOpenStreetMapFavorites = favoriteRestaurants.some(
+    (restaurant) => restaurant.mapsUrl && isOpenStreetMapUrl(restaurant.mapsUrl),
+  );
 
   const savePlanner = async (nextPlanner: WeekMeals) => {
     setWeekMeals(nextPlanner);
@@ -214,6 +217,16 @@ const FavoritesPage = ({
                     />
                   </motion.div>
                 ))}
+                {hasOpenStreetMapFavorites && (
+                  <a
+                    href="https://www.openstreetmap.org/copyright"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[10px] font-body text-muted-foreground underline underline-offset-2"
+                  >
+                    © OpenStreetMap contributors
+                  </a>
+                )}
               </div>
             ) : (
               <div className="flex flex-col items-center py-12">

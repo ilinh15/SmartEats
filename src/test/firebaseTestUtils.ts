@@ -37,6 +37,16 @@ const mergeDocuments = (
 
 const joinPath = (segments: unknown[]) => segments.map(String).join("/");
 
+const validateDocumentPath = (segments: unknown[]) => {
+  const path = joinPath(segments);
+
+  if (path.split("/").length % 2 !== 0) {
+    throw new Error(`Invalid document reference. Document references must have an even number of segments, but ${path} has an odd number.`);
+  }
+
+  return path;
+};
+
 const getDocumentId = (path: string) => {
   const segments = path.split("/");
   return segments[segments.length - 1] ?? path;
@@ -170,7 +180,7 @@ export const firebaseFirestoreModuleMock = {
   getFirestore: vi.fn(() => mockDb),
   doc: vi.fn((database: unknown, ...segments: unknown[]) => ({
     database,
-    path: joinPath(segments),
+    path: validateDocumentPath(segments),
     id: String(segments[segments.length - 1] ?? ""),
   })),
   collection: vi.fn((database: unknown, ...segments: unknown[]) => ({

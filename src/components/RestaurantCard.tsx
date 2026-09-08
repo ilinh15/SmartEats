@@ -13,13 +13,42 @@ interface RestaurantCardProps {
   distance?: string;
   image?: string;
   imageUrl?: string | null;
-  mapsLabel?: string;
   mapsUrl?: string;
   photoAttributions?: PhotoAttribution[];
   rating?: number | null;
   isFavorited?: boolean;
   onToggleFavorite?: () => void;
 }
+
+const getUrl = (value: string) => {
+  try {
+    return new URL(value);
+  } catch {
+    return null;
+  }
+};
+
+export const isOpenStreetMapUrl = (value: string) => {
+  const hostname = getUrl(value)?.hostname.toLocaleLowerCase();
+  return hostname === "openstreetmap.org" || hostname?.endsWith(".openstreetmap.org") === true;
+};
+
+const getMapLinkLabel = (value: string) => {
+  const url = getUrl(value);
+  if (!url) return "Open map";
+
+  const hostname = url.hostname.toLocaleLowerCase();
+  if (isOpenStreetMapUrl(value)) return "Open in OpenStreetMap";
+  if (
+    hostname === "maps.google.com"
+    || ((hostname === "google.com" || hostname.endsWith(".google.com"))
+      && (url.pathname === "/maps" || url.pathname.startsWith("/maps/")))
+  ) {
+    return "Open in Google Maps";
+  }
+
+  return "Open map";
+};
 
 const RestaurantCard = ({
   name,
@@ -28,7 +57,6 @@ const RestaurantCard = ({
   distance,
   image,
   imageUrl,
-  mapsLabel = "Open in OpenStreetMap",
   mapsUrl,
   photoAttributions,
   rating,
@@ -36,6 +64,7 @@ const RestaurantCard = ({
   onToggleFavorite,
 }: RestaurantCardProps) => {
   const imageSource = imageUrl ?? image;
+  const mapLinkLabel = mapsUrl ? getMapLinkLabel(mapsUrl) : undefined;
 
   const content = (
     <>
@@ -129,11 +158,12 @@ const RestaurantCard = ({
           <div className="mt-3 pt-3 border-t border-border">
             <a
               href={mapsUrl}
+              aria-label={mapLinkLabel}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-primary/10 text-primary text-xs font-body font-medium hover:bg-primary/15 transition-colors"
             >
-              {mapsLabel}
+              {mapLinkLabel}
               <ArrowUpRight size={14} />
             </a>
           </div>
