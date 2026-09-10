@@ -333,6 +333,10 @@ const hasMistralKey = () =>
   !!import.meta.env.VITE_MISTRAL_API_KEY &&
   import.meta.env.VITE_MISTRAL_API_KEY !== "your-mistral-api-key-here";
 
+const hasGroqKey = () =>
+  !!import.meta.env.VITE_GROQ_API_KEY &&
+  import.meta.env.VITE_GROQ_API_KEY !== "your-groq-api-key-here";
+
 const hasUnsplashKey = () =>
   !!import.meta.env.VITE_UNSPLASH_ACCESS_KEY &&
   import.meta.env.VITE_UNSPLASH_ACCESS_KEY !== "your-unsplash-access-key";
@@ -409,8 +413,8 @@ const extractJsonPayload = (responseText: string) => {
 };
 
 const requestRecommendationJson = async (prompt: string) => {
-  if (!hasGeminiKey() && !hasMistralKey()) {
-    throw new Error("No AI provider configured. Add VITE_GEMINI_API_KEY or VITE_MISTRAL_API_KEY to enable AI cooking recommendations.");
+  if (!hasGeminiKey() && !hasMistralKey() && !hasGroqKey()) {
+    throw new Error("No AI provider configured. Add VITE_GEMINI_API_KEY, VITE_MISTRAL_API_KEY, or VITE_GROQ_API_KEY to enable AI cooking recommendations.");
   }
 
   let responseJson = "";
@@ -465,46 +469,88 @@ const requestRecommendationJson = async (prompt: string) => {
   }
 
   if (!responseJson && hasGeminiKey()) {
-    const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    const geminiModel = String(import.meta.env.VITE_GEMINI_MODEL || "gemini-3.6-flash").toLowerCase().trim();
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: "user",
-              parts: [
-                {
-                  text: prompt,
-                },
-              ],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.8,
-            maxOutputTokens: 8192,
-            responseMimeType: "application/json",
+    try {
+      const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      const geminiModel = String(import.meta.env.VITE_GEMINI_MODEL || "gemini-3.6-flash").toLowerCase().trim();
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
           },
-        }),
+          body: JSON.stringify({
+            contents: [
+              {
+                role: "user",
+                parts: [
+                  {
+                    text: prompt,
+                  },
+                ],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.8,
+              maxOutputTokens: 8192,
+              responseMimeType: "application/json",
+            },
+          }),
+        },
+      );
+
+      const responseText = await response.text();
+
+      if (!response.ok) {
+        throw new Error(`Gemini API error: ${response.status} - ${responseText}`);
+      }
+
+      const data = JSON.parse(responseText) as GeminiResponse;
+      const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (!textContent) {
+        throw new Error("No JSON payload returned from Gemini.");
+      }
+
+      responseJson = textContent.trim();
+    } catch (error) {
+      if (!hasGroqKey()) {
+        throw error;
+      }
+      console.warn("Gemini recommendation generation failed, falling back to Groq:", error);
+    }
+  }
+
+  if (!responseJson && hasGroqKey()) {
+    const groqKey = import.meta.env.VITE_GROQ_API_KEY;
+    const groqModel = import.meta.env.VITE_GROQ_MODEL || "llama-3.3-70b-versatile";
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${groqKey}`,
       },
-    );
+      body: JSON.stringify({
+        model: groqModel,
+        messages: [
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        temperature: 0.8,
+      }),
+    });
 
     const responseText = await response.text();
-
     if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.status} - ${responseText}`);
+      throw new Error(`Groq Cloud API error: ${response.status} - ${responseText}`);
     }
 
-    const data = JSON.parse(responseText) as GeminiResponse;
-    const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
+    const data = JSON.parse(responseText) as GroqResponse;
+    const textContent = data.choices?.[0]?.message?.content;
     if (!textContent) {
-      throw new Error("No JSON payload returned from Gemini.");
+      throw new Error("No JSON payload returned from Groq Cloud.");
     }
 
     responseJson = textContent.trim();

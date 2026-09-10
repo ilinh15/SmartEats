@@ -150,7 +150,7 @@ const HomePage = ({
           <p className="text-sm font-body text-foreground">Could not load live restaurant recommendations right now.</p>
           <p className="text-xs font-body text-muted-foreground mt-1">
             {error.message.includes("VITE_GOOGLE_MAPS_API_KEY")
-              ? "Add VITE_GOOGLE_MAPS_API_KEY to enable Google Places results."
+              ? "The app is using OpenStreetMap for live restaurant recommendations."
               : error.message}
           </p>
         </div>

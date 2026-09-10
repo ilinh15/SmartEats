@@ -228,7 +228,7 @@ const NearbyPage = ({ favoriteRestaurantIds, onToggleFavoriteRestaurant }: Nearb
               <p className="text-sm font-body text-foreground">Could not load nearby places right now.</p>
               <p className="text-xs font-body text-muted-foreground mt-1">
                 {(placesQuery.error as Error).message.includes("VITE_GOOGLE_MAPS_API_KEY")
-                  ? "Add VITE_GOOGLE_MAPS_API_KEY to your environment to enable Google Places."
+                  ? "The app is using OpenStreetMap for live food search results."
                   : (placesQuery.error as Error).message}
               </p>
             </div>

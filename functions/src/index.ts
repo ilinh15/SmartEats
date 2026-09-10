@@ -36,6 +36,14 @@ interface MistralResponse {
   }>;
 }
 
+interface GroqResponse {
+  choices?: Array<{
+    message?: {
+      content?: string;
+    };
+  }>;
+}
+
 const corsHandler = cors({ origin: true });
 
 // Helper to call Gemini API
@@ -121,6 +129,46 @@ async function callMistralAPI(prompt: string): Promise<string> {
   return textContent;
 }
 
+// Helper to call Groq Cloud API
+async function callGroqAPI(prompt: string): Promise<string> {
+  const apiKey = process.env.VITE_GROQ_API_KEY;
+  if (!apiKey) {
+    throw new Error("VITE_GROQ_API_KEY not configured");
+  }
+
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: process.env.VITE_GROQ_MODEL || "llama-3.3-70b-versatile",
+      messages: [
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      temperature: 0.7,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Groq Cloud API error: ${response.status} - ${error}`);
+  }
+
+  const data = (await response.json()) as GroqResponse;
+  const textContent = data?.choices?.[0]?.message?.content;
+
+  if (!textContent) {
+    throw new Error("No text content in Groq Cloud response");
+  }
+
+  return textContent;
+}
+
 export const generateRecipe = functions.https.onRequest((req, res) => {
   corsHandler(req, res, async () => {
     if (req.method !== "POST") {
@@ -155,12 +203,35 @@ Return ONLY the JSON object, no markdown, no code blocks, no explanations. Valid
       let recipeJson: string;
       const hasGeminiKey = !!process.env.VITE_GEMINI_API_KEY?.trim();
       const hasMistralKey = !!process.env.VITE_MISTRAL_API_KEY?.trim();
+      const hasGroqKey = !!process.env.VITE_GROQ_API_KEY?.trim();
 
       if (hasGeminiKey) {
-        recipeJson = await callGeminiAPI(prompt);
-      } else if (hasMistralKey) {
-        recipeJson = await callMistralAPI(prompt);
-      } else {
+        try {
+          recipeJson = await callGeminiAPI(prompt);
+        } catch (error) {
+          if (!hasMistralKey && !hasGroqKey) {
+            throw error;
+          }
+          console.warn("Gemini API failed in Firebase function, trying fallback provider:", error);
+        }
+      }
+
+      if (!recipeJson && hasMistralKey) {
+        try {
+          recipeJson = await callMistralAPI(prompt);
+        } catch (error) {
+          if (!hasGroqKey) {
+            throw error;
+          }
+          console.warn("Mistral API failed in Firebase function, trying Groq Cloud:", error);
+        }
+      }
+
+      if (!recipeJson && hasGroqKey) {
+        recipeJson = await callGroqAPI(prompt);
+      }
+
+      if (!recipeJson) {
         throw new Error("No AI provider configured");
       }
 

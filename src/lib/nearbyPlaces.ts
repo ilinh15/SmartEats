@@ -1,11 +1,6 @@
 import type { Coordinates } from "@/lib/geolocation";
 import type { MealPeriod } from "@/lib/mealTime";
-import {
-  loadGoogleMapsPlacesLibrary,
-  type GoogleMapsAuthorAttribution,
-  type GoogleMapsPhoto,
-  type GoogleMapsPlace,
-} from "@/lib/googleMapsPlaces";
+import { geocodeArea, searchNearbyFoodByCoordinates, type OpenStreetMapSearchResult } from "@/lib/openStreetMap";
 
 export type NearbyFilter = "All" | "Restaurant" | "Takeaway" | "Cafe" | "Food Court" | "Open Now";
 
@@ -13,7 +8,7 @@ export interface NearbyPlace {
   id: string;
   name: string;
   imageUrl: string | null;
-  photoAttributions: GoogleMapsAuthorAttribution[];
+  photoAttributions: Array<{ displayName: string; uri?: string }>;
   distanceText?: string;
   rating: number | null;
   address: string;
@@ -93,21 +88,15 @@ const dedupePlaces = (places: NearbyPlace[]) => {
   });
 };
 
-const getPhotoData = (photo?: GoogleMapsPhoto) => ({
-  imageUrl: photo ? photo.getURI({ maxWidth: 240, maxHeight: 240 }) : null,
-  photoAttributions: photo?.authorAttributions ?? [],
+const getPhotoData = (place: OpenStreetMapSearchResult) => ({
+  imageUrl: place.imageUrl ?? null,
+  photoAttributions: place.photoAttributions ?? [],
 });
 
-const getLatLng = (place: GoogleMapsPlace) => {
-  if (!place.location) {
-    return null;
-  }
-
-  return {
-    lat: place.location.lat(),
-    lng: place.location.lng(),
-  };
-};
+const getLatLng = (place: OpenStreetMapSearchResult) => ({
+  lat: place.lat,
+  lng: place.lng,
+});
 
 const formatDistance = (meters: number) => {
   if (meters < 1000) {
@@ -134,25 +123,24 @@ const calculateDistanceMeters = (from: Coordinates, to: Coordinates) => {
   return earthRadius * c;
 };
 
-const normalizePlace = (place: GoogleMapsPlace, userLocation?: Coordinates, isOpenNow?: boolean): NearbyPlace => {
-  const photo = place.photos?.[0];
-  const photoData = getPhotoData(photo);
+const normalizePlace = (place: OpenStreetMapSearchResult, userLocation?: Coordinates, isOpenNow?: boolean): NearbyPlace => {
+  const photoData = getPhotoData(place);
   const placeCoordinates = getLatLng(place);
 
   return {
-    id: place.id ?? place.googleMapsURI ?? `${place.displayName ?? "place"}-${place.formattedAddress ?? "address"}`,
-    name: place.displayName ?? "Unknown place",
+    id: place.id,
+    name: place.name,
     imageUrl: photoData.imageUrl,
     photoAttributions: photoData.photoAttributions,
     distanceText:
       userLocation && placeCoordinates
         ? formatDistance(calculateDistanceMeters(userLocation, placeCoordinates))
         : undefined,
-    rating: typeof place.rating === "number" ? Number(place.rating.toFixed(1)) : null,
-    address: place.formattedAddress ?? "Address unavailable",
-    primaryType: place.primaryTypeDisplayName ?? place.primaryType,
+    rating: null,
+    address: place.address,
+    primaryType: place.primaryType,
     isOpenNow,
-    mapsUrl: place.googleMapsURI,
+    mapsUrl: place.mapsUrl,
   };
 };
 
@@ -195,38 +183,26 @@ export const searchPlacesByArea = async ({
   userLocation,
   radius = DEFAULT_RADIUS_METERS,
 }: AreaSearchParams): Promise<NearbyPlace[]> => {
-  const { Place, SearchByTextRankPreference } = await loadGoogleMapsPlacesLibrary();
   const trimmedQuery = textQuery.trim();
 
   if (!trimmedQuery) {
     return [];
   }
 
-  const request: Record<string, unknown> = {
-    fields: PLACE_FIELDS,
-    maxResultCount: 12,
-    rankPreference: userLocation ? SearchByTextRankPreference.DISTANCE : SearchByTextRankPreference.RELEVANCE,
-    textQuery: buildManualTextQuery(trimmedQuery, filter),
-  };
-
-  if (userLocation) {
-    request.locationBias = {
-      center: userLocation,
-      radius,
-    };
+  const geocodedLocation = (await geocodeArea(trimmedQuery)) ?? userLocation;
+  if (!geocodedLocation) {
+    return [];
   }
 
-  if (filter === "Open Now") {
-    request.isOpenNow = true;
-  } else if (filter !== "All") {
-    request.includedType = FILTER_TYPE_MAP[filter];
-    request.useStrictTypeFiltering = true;
-  }
-
-  const response = await Place.searchByText(request);
+  const results = await searchNearbyFoodByCoordinates({
+    lat: geocodedLocation.lat,
+    lng: geocodedLocation.lng,
+    radius,
+    filter,
+  });
 
   return dedupePlaces(
-    (response.places ?? []).map((place) => normalizePlace(place, userLocation, filter === "Open Now")),
+    results.map((place) => normalizePlace(place, userLocation ?? geocodedLocation, filter === "Open Now")),
   );
 };
 
@@ -236,30 +212,9 @@ export const searchNearbyPlaces = async ({
   radius = DEFAULT_RADIUS_METERS,
   filter,
 }: NearbySearchParams): Promise<NearbyPlace[]> => {
-  if (filter === "Open Now") {
-    return searchPlacesByArea({
-      textQuery: "my location",
-      filter,
-      radius,
-      userLocation: { lat, lng },
-    });
-  }
+  const results = await searchNearbyFoodByCoordinates({ lat, lng, radius, filter });
 
-  const { Place, SearchNearbyRankPreference } = await loadGoogleMapsPlacesLibrary();
-  const response = await Place.searchNearby({
-    fields: PLACE_FIELDS,
-    includedTypes: getNearbyRequestTypes(filter),
-    locationRestriction: {
-      center: { lat, lng },
-      radius,
-    },
-    maxResultCount: 12,
-    rankPreference: SearchNearbyRankPreference.DISTANCE,
-  });
-
-  return dedupePlaces(
-    (response.places ?? []).map((place) => normalizePlace(place, { lat, lng })),
-  );
+  return dedupePlaces(results.map((place) => normalizePlace(place, { lat, lng }, filter === "Open Now")));
 };
 
 export const searchMealRecommendations = async ({
@@ -268,19 +223,13 @@ export const searchMealRecommendations = async ({
   mealPeriod,
   radius = DEFAULT_RADIUS_METERS,
 }: MealRecommendationSearchParams): Promise<NearbyPlace[]> => {
-  const { Place, SearchByTextRankPreference } = await loadGoogleMapsPlacesLibrary();
-  const response = await Place.searchByText({
-    fields: PLACE_FIELDS,
-    locationBias: {
-      center: { lat, lng },
-      radius,
-    },
-    maxResultCount: 8,
-    rankPreference: SearchByTextRankPreference.RELEVANCE,
-    textQuery: MEAL_QUERY_MAP[mealPeriod],
+  const filter = mealPeriod === "breakfast" ? "Cafe" : "Restaurant";
+  const results = await searchNearbyFoodByCoordinates({
+    lat,
+    lng,
+    radius,
+    filter,
   });
 
-  return dedupePlaces(
-    (response.places ?? []).map((place) => normalizePlace(place, { lat, lng })),
-  );
+  return dedupePlaces(results.map((place) => normalizePlace(place, { lat, lng }))).slice(0, 8);
 };

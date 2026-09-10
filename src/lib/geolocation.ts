@@ -10,8 +10,20 @@ export interface GeolocationFailure {
 
 export const getCurrentPosition = (): Promise<Coordinates> =>
   new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
+    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
       reject({ message: "Geolocation is not supported by this browser." } satisfies GeolocationFailure);
+      return;
+    }
+
+    const isSecureContext = typeof window !== "undefined" && "isSecureContext" in window ? window.isSecureContext : false;
+    const hostname = typeof window !== "undefined" ? window.location.hostname : "";
+    const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]" || hostname.startsWith("127.");
+
+    if (!isSecureContext && !isLocalhost) {
+      reject({
+        code: 0,
+        message: "Location access requires a secure connection. Please use HTTPS or localhost, then try again.",
+      } satisfies GeolocationFailure);
       return;
     }
 
@@ -23,15 +35,20 @@ export const getCurrentPosition = (): Promise<Coordinates> =>
         });
       },
       (error) => {
+        const message =
+          error.code === error.TIMEOUT
+            ? "Location request timed out. Please try again and make sure your device has a clear GPS signal."
+            : error.message || "Unable to retrieve your location.";
+
         reject({
           code: error.code,
-          message: error.message || "Unable to retrieve your location.",
+          message,
         } satisfies GeolocationFailure);
       },
       {
-        enableHighAccuracy: true,
-        maximumAge: 60_000,
-        timeout: 10_000,
+        enableHighAccuracy: false,
+        maximumAge: 30_000,
+        timeout: 30_000,
       },
     );
   });

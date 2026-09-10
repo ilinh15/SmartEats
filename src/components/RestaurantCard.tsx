@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ArrowUpRight, Heart, ImageOff, MapPin, Star } from "lucide-react";
+import { ArrowUpRight, Heart, MapPin, Star, UtensilsCrossed } from "lucide-react";
 
 interface PhotoAttribution {
   displayName: string;
@@ -28,7 +28,7 @@ const RestaurantCard = ({
   distance,
   image,
   imageUrl,
-  mapsLabel = "Open in Google Maps",
+  mapsLabel = "View on OpenStreetMap",
   mapsUrl,
   photoAttributions,
   rating,
@@ -39,13 +39,40 @@ const RestaurantCard = ({
 
   const content = (
     <>
-      <div className="w-20 h-20 rounded-2xl overflow-hidden flex-shrink-0 bg-accent/60 flex items-center justify-center">
+      <div className="w-20 h-20 rounded-2xl overflow-hidden flex-shrink-0 bg-accent/60">
         {imageSource ? (
-          <img src={imageSource} alt={name} className="w-full h-full object-cover" loading="lazy" />
+          <img
+            src={imageSource}
+            alt={name}
+            className="w-full h-full object-cover"
+            loading="lazy"
+            onError={(event) => {
+              const target = event.currentTarget;
+              target.style.display = "none";
+              const parent = target.parentElement;
+              if (parent) {
+                parent.innerHTML = `
+                  <div class="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-primary/25 via-secondary/15 to-orange-500/20 text-primary">
+                    <div class="rounded-full bg-background/70 p-2 shadow-sm">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M3 2v7c0 1.1.9 2 2 2h1l1 9h8l1-9h1c1.1 0 2-.9 2-2V2"/>
+                        <path d="M7 2v7"/>
+                        <path d="M17 2v7"/>
+                        <path d="M3 9h18"/>
+                      </svg>
+                    </div>
+                    <span class="mt-1 text-[8px] font-semibold uppercase tracking-[0.18em]">SmartEats</span>
+                  </div>
+                `;
+              }
+            }}
+          />
         ) : (
-          <div className="flex flex-col items-center gap-1 text-muted-foreground">
-            <ImageOff size={18} />
-            <span className="text-[10px] font-body font-medium">No photo</span>
+          <div className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-primary/25 via-secondary/15 to-orange-500/20 text-primary">
+            <div className="rounded-full bg-background/70 p-2 shadow-sm">
+              <UtensilsCrossed size={16} />
+            </div>
+            <span className="mt-1 text-[8px] font-semibold uppercase tracking-[0.18em]">SmartEats</span>
           </div>
         )}
       </div>
