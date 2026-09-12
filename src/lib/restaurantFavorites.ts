@@ -5,6 +5,7 @@ import type { NearbyPlace } from "@/lib/nearbyPlaces";
 const FAVORITE_RESTAURANTS_COLLECTION = "favorite_restaurants";
 
 interface FavoriteRestaurantDocument {
+  restaurantId?: unknown;
   name?: unknown;
   address?: unknown;
   imageUrl?: unknown;
@@ -17,6 +18,20 @@ interface FavoriteRestaurantDocument {
 }
 
 const toNullableString = (value: unknown) => (typeof value === "string" ? value : null);
+
+const toDocumentId = (restaurantId: string) => encodeURIComponent(restaurantId);
+
+const toRestaurantId = (rawDocumentId: string, restaurantId?: unknown) => {
+  if (typeof restaurantId === "string" && restaurantId.trim().length > 0) {
+    return restaurantId;
+  }
+
+  try {
+    return decodeURIComponent(rawDocumentId);
+  } catch {
+    return rawDocumentId;
+  }
+};
 
 const toOptionalString = (value: unknown) => (typeof value === "string" ? value : undefined);
 
@@ -32,9 +47,11 @@ const mapFavoriteRestaurant = (
     return null;
   }
 
+  const restaurantId = toRestaurantId(id, data.restaurantId);
+
   return {
     restaurant: {
-      id,
+      id: restaurantId,
       name: data.name,
       address: data.address,
       imageUrl: toNullableString(data.imageUrl),
@@ -53,7 +70,7 @@ const getFavoriteRestaurantCollection = (uid: string) =>
   collection(db!, "users", uid, FAVORITE_RESTAURANTS_COLLECTION);
 
 const getFavoriteRestaurantDocument = (uid: string, restaurantId: string) =>
-  doc(db!, "users", uid, FAVORITE_RESTAURANTS_COLLECTION, restaurantId);
+  doc(db!, "users", uid, FAVORITE_RESTAURANTS_COLLECTION, toDocumentId(restaurantId));
 
 export const loadFavoriteRestaurants = async (uid: string): Promise<NearbyPlace[]> => {
   if (!isFirebaseConfigured || !db || !uid) {
@@ -90,6 +107,7 @@ export const toggleFavoriteRestaurant = async (
   }
 
   await setDoc(favoriteDocument, {
+    restaurantId: restaurant.id,
     name: restaurant.name,
     address: restaurant.address,
     imageUrl: restaurant.imageUrl,

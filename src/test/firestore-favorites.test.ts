@@ -90,6 +90,26 @@ describe("Firestore favorites repositories", () => {
     expect(getFirestoreDocument("users/user-a/favorite_restaurants/rest-1")).toBeNull();
   });
 
+  it("stores restaurant favorites with slash-containing IDs using a Firestore-safe document key", async () => {
+    const osmRestaurant: NearbyPlace = {
+      ...sampleRestaurant,
+      id: "node/123456789",
+      name: "Jurong Eatery",
+      address: "Jurong West, Singapore",
+      mapsUrl: "https://www.openstreetmap.org/node/123456789",
+    };
+
+    await toggleFavoriteRestaurant("user-a", osmRestaurant);
+
+    expect(getFirestoreDocument("users/user-a/favorite_restaurants/node%2F123456789")).toMatchObject({
+      restaurantId: "node/123456789",
+      name: "Jurong Eatery",
+    });
+
+    const favorites = await loadFavoriteRestaurants("user-a");
+    expect(favorites).toContainEqual(expect.objectContaining({ id: "node/123456789", name: "Jurong Eatery" }));
+  });
+
   it("loads only the signed-in user's recipe favorites", async () => {
     seedFirestoreDocument("users/user-a/favorite_recipes/tamago-sando", {
       ...sampleRecipe,
