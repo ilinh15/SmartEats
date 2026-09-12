@@ -28,13 +28,44 @@ export interface UserProfile {
   preferences: string[];
   createdAt: string;
   mealPlanner?: Record<string, { id: string; name: string }[]>;
+  mealPlannerWeekStart?: string;
   budgetPreference?: BudgetPreference | null;
   notificationSettings?: NotificationSettings;
   updatedAt?: string;
 }
 
-export type MealPlannerEntry = { id: string; name: string };
+export type MealPlannerMealType = "breakfast" | "lunch" | "dinner" | "supper" | "snack";
+
+export type MealPlannerEntry = {
+  id: string;
+  name: string;
+  mealType?: MealPlannerMealType;
+  notes?: string;
+  ingredients?: string;
+  instructions?: string;
+  tutorialLink?: string;
+};
 export type MealPlanner = Record<string, MealPlannerEntry[]>;
+
+export const getCurrentPlannerWeekStart = (date = new Date()) => {
+  const current = new Date(date);
+  const day = current.getDay();
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+
+  current.setDate(current.getDate() + diffToMonday);
+  current.setHours(0, 0, 0, 0);
+
+  const year = current.getFullYear();
+  const month = String(current.getMonth() + 1).padStart(2, "0");
+  const dayOfMonth = String(current.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${dayOfMonth}`;
+};
+
+export const shouldResetMealPlanner = (savedWeekStart?: string, date = new Date()) => {
+  const currentWeekStart = getCurrentPlannerWeekStart(date);
+  return !savedWeekStart || savedWeekStart !== currentWeekStart;
+};
 
 /**
  * Get current authenticated user
@@ -102,6 +133,7 @@ export const updateUserPreferences = async (
 
 export const getUserMealPlanner = async (
   uid: string,
+  referenceDate = new Date(),
 ): Promise<MealPlanner> => {
   try {
     const db = getFirestore();
@@ -112,6 +144,13 @@ export const getUserMealPlanner = async (
     }
 
     const data = userDoc.data();
+    const currentWeekStart = getCurrentPlannerWeekStart(referenceDate);
+    const savedWeekStart = typeof data.mealPlannerWeekStart === "string" ? data.mealPlannerWeekStart : undefined;
+
+    if (shouldResetMealPlanner(savedWeekStart, referenceDate) || savedWeekStart !== currentWeekStart) {
+      await updateUserMealPlanner(uid, {}, currentWeekStart);
+      return {};
+    }
 
     if (typeof data.mealPlanner === "object" && data.mealPlanner !== null) {
       return data.mealPlanner as MealPlanner;
@@ -127,11 +166,13 @@ export const getUserMealPlanner = async (
 export const updateUserMealPlanner = async (
   uid: string,
   mealPlanner: MealPlanner,
+  weekStart = getCurrentPlannerWeekStart(),
 ): Promise<void> => {
   try {
     const db = getFirestore();
     await updateDoc(doc(db, "users", uid), {
       mealPlanner,
+      mealPlannerWeekStart: weekStart,
       updatedAt: new Date().toISOString(),
     });
   } catch (error) {

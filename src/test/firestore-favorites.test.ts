@@ -3,6 +3,11 @@ import type { NearbyPlace } from "@/lib/nearbyPlaces";
 import type { CookingRecommendation } from "@/lib/cookingRecommendations";
 import { loadFavoriteRestaurants, toggleFavoriteRestaurant } from "@/lib/restaurantFavorites";
 import {
+  getCurrentPlannerWeekStart,
+  getUserMealPlanner,
+  shouldResetMealPlanner,
+} from "@/lib/authUtils";
+import {
   createSavedRecipeFromGeneratedRecipe,
   loadFavoriteRecipes,
   toggleFavoriteRecipe,
@@ -108,6 +113,24 @@ describe("Firestore favorites repositories", () => {
 
     const favorites = await loadFavoriteRestaurants("user-a");
     expect(favorites).toContainEqual(expect.objectContaining({ id: "node/123456789", name: "Jurong Eatery" }));
+  });
+
+  it("resets the planner when the saved week is from a previous Monday", async () => {
+    const oldWeekStart = "2026-09-07";
+    const nextMonday = new Date("2026-09-14T12:00:00");
+
+    seedFirestoreDocument("users/user-a", {
+      mealPlanner: {
+        Mon: [{ id: "old-meal", name: "Old Meal" }],
+      },
+      mealPlannerWeekStart: oldWeekStart,
+    });
+
+    expect(shouldResetMealPlanner(oldWeekStart, nextMonday)).toBe(true);
+    expect(getCurrentPlannerWeekStart(nextMonday)).toBe("2026-09-14");
+
+    const planner = await getUserMealPlanner("user-a", nextMonday);
+    expect(planner).toEqual({});
   });
 
   it("loads only the signed-in user's recipe favorites", async () => {

@@ -1,17 +1,24 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { CalendarDays, Heart, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, Heart, Link2, NotebookText, Plus, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import CookingRecommendationCard from "@/components/CookingRecommendationCard";
 import RestaurantCard from "@/components/RestaurantCard";
 import type { NearbyPlace } from "@/lib/nearbyPlaces";
-import { getUserMealPlanner, updateUserMealPlanner, type MealPlanner } from "@/lib/authUtils";
+import {
+  getUserMealPlanner,
+  updateUserMealPlanner,
+  type MealPlanner,
+  type MealPlannerEntry,
+} from "@/lib/authUtils";
 import type { FavoriteRecipeInput, SavedRecipe } from "@/lib/recipeFavorites";
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-type Meal = { id: string; name: string };
+const mealTypeOptions = ["breakfast", "lunch", "dinner", "supper"] as const;
+
+type Meal = MealPlannerEntry;
 type WeekMeals = Record<string, Meal[]>;
 
 const initialMeals: WeekMeals = {
@@ -53,7 +60,15 @@ const FavoritesPage = ({
   const [selectedDay, setSelectedDay] = useState("Mon");
   const [weekMeals, setWeekMeals] = useState<WeekMeals>(initialMeals);
   const [isAdding, setIsAdding] = useState(false);
-  const [newMealName, setNewMealName] = useState("");
+  const [editingMealId, setEditingMealId] = useState<string | null>(null);
+  const [mealForm, setMealForm] = useState({
+    name: "",
+    mealType: "breakfast" as MealPlannerEntry["mealType"],
+    notes: "",
+    ingredients: "",
+    instructions: "",
+    tutorialLink: "",
+  });
   const [isLoadingPlanner, setIsLoadingPlanner] = useState(false);
   const { toast } = useToast();
   const tabs = ["Recipes", `Restaurants (${favoriteRestaurants.length})`, "Planner"];
@@ -87,17 +102,67 @@ const FavoritesPage = ({
     savePlanner(nextPlanner);
   };
 
+  const resetMealForm = () => {
+    setMealForm({
+      name: "",
+      mealType: "breakfast",
+      notes: "",
+      ingredients: "",
+      instructions: "",
+      tutorialLink: "",
+    });
+    setEditingMealId(null);
+    setIsAdding(false);
+  };
+
   const handleAddMeal = () => {
-    if (!newMealName.trim()) return;
-    const newMeal: Meal = { id: Date.now().toString(), name: newMealName.trim() };
+    if (!mealForm.name.trim()) {
+      toast({
+        title: "Meal name required",
+        description: "Please add a meal name before saving it to your plan.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const updatedMeal: Meal = {
+      id: editingMealId ?? Date.now().toString(),
+      name: mealForm.name.trim(),
+      mealType: mealForm.mealType,
+      notes: mealForm.notes.trim(),
+      ingredients: mealForm.ingredients.trim(),
+      instructions: mealForm.instructions.trim(),
+      tutorialLink: mealForm.tutorialLink.trim(),
+    };
+
     const nextPlanner = {
       ...weekMeals,
-      [selectedDay]: [...(weekMeals[selectedDay] || []), newMeal],
+      [selectedDay]: (() => {
+        const existingMeals = weekMeals[selectedDay] || [];
+
+        if (editingMealId) {
+          return existingMeals.map((meal) => (meal.id === editingMealId ? updatedMeal : meal));
+        }
+
+        return [...existingMeals, updatedMeal];
+      })(),
     };
 
     savePlanner(nextPlanner);
-    setNewMealName("");
-    setIsAdding(false);
+    resetMealForm();
+  };
+
+  const handleEditMeal = (meal: Meal) => {
+    setEditingMealId(meal.id);
+    setMealForm({
+      name: meal.name,
+      mealType: meal.mealType ?? "breakfast",
+      notes: meal.notes ?? "",
+      ingredients: meal.ingredients ?? "",
+      instructions: meal.instructions ?? "",
+      tutorialLink: meal.tutorialLink ?? "",
+    });
+    setIsAdding(true);
   };
 
   useEffect(() => {
@@ -259,16 +324,65 @@ const FavoritesPage = ({
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: 20 }}
-                      className="flex items-center gap-3 bg-card rounded-2xl p-4 shadow-soft"
+                      className="flex flex-col gap-3 bg-card rounded-2xl p-4 shadow-soft"
                     >
-                      <CalendarDays size={18} className="text-primary flex-shrink-0" />
-                      <span className="flex-1 text-sm font-body text-foreground">{meal.name}</span>
-                      <button
-                        onClick={() => handleDeleteMeal(selectedDay, meal.id)}
-                        className="p-2 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      <div className="flex items-start gap-3">
+                        <CalendarDays size={18} className="text-primary flex-shrink-0 mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-sm font-body font-semibold text-foreground">{meal.name}</span>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              {meal.mealType ? (
+                                <span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] uppercase tracking-[0.08em] text-primary">
+                                  {meal.mealType}
+                                </span>
+                              ) : null}
+                              <button
+                                onClick={() => handleEditMeal(meal)}
+                                className="px-2 py-1.5 rounded-xl text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteMeal(selectedDay, meal.id)}
+                                className="p-2 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </div>
+
+                          {meal.notes ? (
+                            <p className="mt-2 text-xs text-muted-foreground whitespace-pre-line">{meal.notes}</p>
+                          ) : null}
+
+                          {meal.ingredients ? (
+                            <div className="mt-2">
+                              <p className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground">Ingredients</p>
+                              <p className="text-xs text-foreground whitespace-pre-line">{meal.ingredients}</p>
+                            </div>
+                          ) : null}
+
+                          {meal.instructions ? (
+                            <div className="mt-2">
+                              <p className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground">Instructions</p>
+                              <p className="text-xs text-foreground whitespace-pre-line">{meal.instructions}</p>
+                            </div>
+                          ) : null}
+
+                          {meal.tutorialLink ? (
+                            <a
+                              href={meal.tutorialLink}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-2 inline-flex items-center gap-1 text-xs text-primary underline-offset-2 hover:underline"
+                            >
+                              <Link2 size={12} />
+                              Open tutorial
+                            </a>
+                          ) : null}
+                        </div>
+                      </div>
                     </motion.div>
                   ))}
 
@@ -282,31 +396,103 @@ const FavoritesPage = ({
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="flex items-center gap-2"
+                      className="space-y-3 rounded-2xl border border-border bg-card p-4 shadow-soft"
                     >
-                      <input
-                        autoFocus
-                        value={newMealName}
-                        onChange={(event) => setNewMealName(event.target.value)}
-                        onKeyDown={(event) => event.key === "Enter" && handleAddMeal()}
-                        placeholder="Enter meal name..."
-                        className="flex-1 bg-card border border-border rounded-2xl px-4 py-3 text-sm font-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                      />
-                      <button
-                        onClick={handleAddMeal}
-                        className="px-4 py-3 bg-primary text-primary-foreground rounded-2xl text-sm font-body font-medium"
-                      >
-                        Add
-                      </button>
-                      <button
-                        onClick={() => {
-                          setIsAdding(false);
-                          setNewMealName("");
-                        }}
-                        className="px-3 py-3 bg-muted text-muted-foreground rounded-2xl text-sm font-body"
-                      >
-                        X
-                      </button>
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Meal name</label>
+                        <input
+                          autoFocus
+                          value={mealForm.name}
+                          onChange={(event) => setMealForm((current) => ({ ...current, name: event.target.value }))}
+                          onKeyDown={(event) => event.key === "Enter" && handleAddMeal()}
+                          placeholder="e.g. Chicken Rice Bowl"
+                          className="w-full bg-background border border-border rounded-2xl px-4 py-3 text-sm font-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Meal section</label>
+                        <select
+                          value={mealForm.mealType}
+                          onChange={(event) =>
+                            setMealForm((current) => ({
+                              ...current,
+                              mealType: event.target.value as MealPlannerEntry["mealType"],
+                            }))
+                          }
+                          className="w-full bg-background border border-border rounded-2xl px-4 py-3 text-sm font-body text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                        >
+                          {mealTypeOptions.map((option) => (
+                            <option key={option} value={option}>
+                              {option.charAt(0).toUpperCase() + option.slice(1)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                          <NotebookText size={14} />
+                          Meal notes
+                        </label>
+                        <textarea
+                          value={mealForm.notes}
+                          onChange={(event) => setMealForm((current) => ({ ...current, notes: event.target.value }))}
+                          placeholder="Write down ideas, mood, or a quick reminder for this meal..."
+                          rows={3}
+                          className="w-full bg-background border border-border rounded-2xl px-4 py-3 text-sm font-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Ingredients</label>
+                        <textarea
+                          value={mealForm.ingredients}
+                          onChange={(event) => setMealForm((current) => ({ ...current, ingredients: event.target.value }))}
+                          placeholder="List ingredients here..."
+                          rows={3}
+                          className="w-full bg-background border border-border rounded-2xl px-4 py-3 text-sm font-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Instructions</label>
+                        <textarea
+                          value={mealForm.instructions}
+                          onChange={(event) => setMealForm((current) => ({ ...current, instructions: event.target.value }))}
+                          placeholder="Write the cooking steps here..."
+                          rows={4}
+                          className="w-full bg-background border border-border rounded-2xl px-4 py-3 text-sm font-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                          <Link2 size={14} />
+                          Tutorial link
+                        </label>
+                        <input
+                          value={mealForm.tutorialLink}
+                          onChange={(event) => setMealForm((current) => ({ ...current, tutorialLink: event.target.value }))}
+                          placeholder="https://youtube.com/... or any recipe tutorial link"
+                          className="w-full bg-background border border-border rounded-2xl px-4 py-3 text-sm font-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                        />
+                      </div>
+
+                      <div className="flex gap-2 pt-2">
+                        <button
+                          onClick={handleAddMeal}
+                          className="flex-1 px-4 py-3 bg-primary text-primary-foreground rounded-2xl text-sm font-body font-medium"
+                        >
+                          {editingMealId ? "Update Meal" : "Save Meal"}
+                        </button>
+                        <button
+                          onClick={resetMealForm}
+                          className="px-4 py-3 bg-muted text-muted-foreground rounded-2xl text-sm font-body"
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </motion.div>
                   ) : (
                     <button
