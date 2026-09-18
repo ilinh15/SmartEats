@@ -38,14 +38,6 @@ interface MistralResponse {
   }>;
 }
 
-interface GroqResponse {
-  choices?: Array<{
-    message?: {
-      content?: string;
-    };
-  }>;
-}
-
 export const buildRecipeGenerationPrompt = (
   ingredients: string[],
   cuisine: string,
@@ -132,11 +124,9 @@ export async function generateRecipeWithGemini(
     !!import.meta.env.VITE_GEMINI_API_KEY && import.meta.env.VITE_GEMINI_API_KEY !== "your-gemini-api-key-here";
   const hasMistralKey =
     !!import.meta.env.VITE_MISTRAL_API_KEY && import.meta.env.VITE_MISTRAL_API_KEY !== "your-mistral-api-key-here";
-  const hasGroqKey =
-    !!import.meta.env.VITE_GROQ_API_KEY && import.meta.env.VITE_GROQ_API_KEY !== "your-groq-api-key-here";
 
-  if (!hasGeminiKey && !hasMistralKey && !hasGroqKey) {
-    throw new Error("No AI provider configured. Please add VITE_GEMINI_API_KEY, VITE_MISTRAL_API_KEY, or VITE_GROQ_API_KEY to .env");
+  if (!hasGeminiKey && !hasMistralKey) {
+    throw new Error("No AI provider configured. Please add VITE_GEMINI_API_KEY or VITE_MISTRAL_API_KEY to .env");
   }
 
   const preferences = normalizeUserPreferences(options.userPreferences);
@@ -241,102 +231,59 @@ export async function generateRecipeWithGemini(
       // Normalize model name to lowercase (API expects lowercase)
       geminiModel = geminiModel.toLowerCase().trim();
 
-      try {
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              contents: [
-                {
-                  role: "user",
-                  parts: [
-                    {
-                      text: request_prompt,
-                    },
-                  ],
-                },
-              ],
-              generationConfig: {
-                temperature: 0.7,
-                maxOutputTokens: 8192,
-                responseMimeType: "application/json",
-              },
-            }),
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
           },
-        );
-
-        const responseText = await response.text();
-        const trimmedResponseText = responseText.trim();
-
-        if (!response.ok) {
-          throw new Error(`Gemini API error: ${response.status} - ${trimmedResponseText}`);
-        }
-
-        // Check if response is HTML (error page)
-        if (trimmedResponseText.startsWith("<")) {
-          throw new Error(`Gemini API returned HTML. Check your API key and model name.`);
-        }
-
-        const data = JSON.parse(trimmedResponseText) as GeminiResponse;
-        const textContent = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-        if (!textContent) {
-          console.error("Gemini response:", data);
-          throw new Error("No text content in Gemini response");
-        }
-
-        const trimmedText = textContent.trim();
-        if (trimmedText.startsWith("<")) {
-          throw new Error("Gemini returned HTML content instead of JSON. Check your API credentials and model name.");
-        }
-
-        recipeJson = trimmedText;
-      } catch (geminiError) {
-        if (!hasGroqKey) {
-          throw geminiError;
-        }
-        console.warn("Gemini API failed, trying Groq Cloud:", geminiError);
-      }
-    }
-
-    if (!recipeJson && hasGroqKey) {
-      const groqKey = import.meta.env.VITE_GROQ_API_KEY;
-      const groqModel = import.meta.env.VITE_GROQ_MODEL || "llama-3.3-70b-versatile";
-
-      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${groqKey}`,
-        },
-        body: JSON.stringify({
-          model: groqModel,
-          messages: [
-            {
-              role: "user",
-              content: request_prompt,
+          body: JSON.stringify({
+            contents: [
+              {
+                role: "user",
+                parts: [
+                  {
+                    text: request_prompt,
+                  },
+                ],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 8192,
+              responseMimeType: "application/json",
             },
-          ],
-          temperature: 0.7,
-        }),
-      });
+          }),
+        },
+      );
 
       const responseText = await response.text();
+      const trimmedResponseText = responseText.trim();
+
       if (!response.ok) {
-        throw new Error(`Groq Cloud API error: ${response.status} - ${responseText}`);
+        throw new Error(`Gemini API error: ${response.status} - ${trimmedResponseText}`);
       }
 
-      const data = JSON.parse(responseText) as GroqResponse;
-      const textContent = data?.choices?.[0]?.message?.content;
+      // Check if response is HTML (error page)
+      if (trimmedResponseText.startsWith("<")) {
+        throw new Error(`Gemini API returned HTML. Check your API key and model name.`);
+      }
+
+      const data = JSON.parse(trimmedResponseText) as GeminiResponse;
+      const textContent = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
       if (!textContent) {
-        throw new Error("No text content in Groq Cloud response");
+        console.error("Gemini response:", data);
+        throw new Error("No text content in Gemini response");
       }
 
-      recipeJson = textContent.trim();
+      const trimmedText = textContent.trim();
+      if (trimmedText.startsWith("<")) {
+        throw new Error("Gemini returned HTML content instead of JSON. Check your API credentials and model name.");
+      }
+
+      recipeJson = trimmedText;
     }
 
     // Extract JSON from response (in case there's extra text)

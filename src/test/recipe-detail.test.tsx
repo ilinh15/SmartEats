@@ -1,3 +1,4 @@
+import { seedCookingRecommendations } from "./cookingRecommendationTestUtils";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import App from "@/App";
@@ -7,6 +8,7 @@ import { seedFirestoreDocument } from "./firebaseTestUtils";
 describe("recipe detail pages", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    seedCookingRecommendations();
     window.history.pushState({}, "", "/");
   });
 

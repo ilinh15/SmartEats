@@ -1,3 +1,4 @@
+import { seedCookingRecommendations } from "./cookingRecommendationTestUtils";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
@@ -59,6 +60,7 @@ const renderIndex = () => {
 describe("recipe favorites flow", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    seedCookingRecommendations();
     mockedGetCurrentPosition.mockReset();
     mockedGetMealTimeContent.mockReset();
     mockedGenerateRecipeWithGemini.mockReset();

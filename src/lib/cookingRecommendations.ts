@@ -1,4 +1,3 @@
-import { mockCookingRecommendations } from "@/data/cookingRecommendations";
 import {
   buildPreferenceInstructions,
   getPreferenceTagLabels,
@@ -80,10 +79,9 @@ interface MistralResponse {
   }>;
 }
 
-const AI_RECOMMENDATION_CACHE_KEY = "smarteats.ai-cooking-recommendations.v2";
+const AI_RECOMMENDATION_CACHE_KEY = "smarteats.ai-cooking-recommendations.v3";
 const AI_RECOMMENDATION_CACHE_TTL_MS = 30 * 60 * 1000;
 const AI_RECOMMENDATION_COUNT = 6;
-const TEST_MODE = import.meta.env.MODE === "test";
 
 const cookingCuisines: CookingCuisine[] = ["chinese", "malay", "indian", "japanese", "korean", "western"];
 const cookingMealTypes: CookingMealType[] = ["breakfast", "lunch", "dinner", "supper"];
@@ -333,10 +331,6 @@ const hasMistralKey = () =>
   !!import.meta.env.VITE_MISTRAL_API_KEY &&
   import.meta.env.VITE_MISTRAL_API_KEY !== "your-mistral-api-key-here";
 
-const hasGroqKey = () =>
-  !!import.meta.env.VITE_GROQ_API_KEY &&
-  import.meta.env.VITE_GROQ_API_KEY !== "your-groq-api-key-here";
-
 const hasUnsplashKey = () =>
   !!import.meta.env.VITE_UNSPLASH_ACCESS_KEY &&
   import.meta.env.VITE_UNSPLASH_ACCESS_KEY !== "your-unsplash-access-key";
@@ -413,8 +407,8 @@ const extractJsonPayload = (responseText: string) => {
 };
 
 const requestRecommendationJson = async (prompt: string) => {
-  if (!hasGeminiKey() && !hasMistralKey() && !hasGroqKey()) {
-    throw new Error("No AI provider configured. Add VITE_GEMINI_API_KEY, VITE_MISTRAL_API_KEY, or VITE_GROQ_API_KEY to enable AI cooking recommendations.");
+  if (!hasGeminiKey() && !hasMistralKey()) {
+    throw new Error("No AI provider configured. Add VITE_GEMINI_API_KEY or VITE_MISTRAL_API_KEY to enable AI cooking recommendations.");
   }
 
   let responseJson = "";
@@ -469,88 +463,46 @@ const requestRecommendationJson = async (prompt: string) => {
   }
 
   if (!responseJson && hasGeminiKey()) {
-    try {
-      const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      const geminiModel = String(import.meta.env.VITE_GEMINI_MODEL || "gemini-3.6-flash").toLowerCase().trim();
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                role: "user",
-                parts: [
-                  {
-                    text: prompt,
-                  },
-                ],
-              },
-            ],
-            generationConfig: {
-              temperature: 0.8,
-              maxOutputTokens: 8192,
-              responseMimeType: "application/json",
-            },
-          }),
+    const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    const geminiModel = String(import.meta.env.VITE_GEMINI_MODEL || "gemini-3.6-flash").toLowerCase().trim();
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
-
-      const responseText = await response.text();
-
-      if (!response.ok) {
-        throw new Error(`Gemini API error: ${response.status} - ${responseText}`);
-      }
-
-      const data = JSON.parse(responseText) as GeminiResponse;
-      const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-      if (!textContent) {
-        throw new Error("No JSON payload returned from Gemini.");
-      }
-
-      responseJson = textContent.trim();
-    } catch (error) {
-      if (!hasGroqKey()) {
-        throw error;
-      }
-      console.warn("Gemini recommendation generation failed, falling back to Groq:", error);
-    }
-  }
-
-  if (!responseJson && hasGroqKey()) {
-    const groqKey = import.meta.env.VITE_GROQ_API_KEY;
-    const groqModel = import.meta.env.VITE_GROQ_MODEL || "llama-3.3-70b-versatile";
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${groqKey}`,
-      },
-      body: JSON.stringify({
-        model: groqModel,
-        messages: [
-          {
-            role: "user",
-            content: prompt,
+        body: JSON.stringify({
+          contents: [
+            {
+              role: "user",
+              parts: [
+                {
+                  text: prompt,
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.8,
+            maxOutputTokens: 8192,
+            responseMimeType: "application/json",
           },
-        ],
-        temperature: 0.8,
-      }),
-    });
+        }),
+      },
+    );
 
     const responseText = await response.text();
+
     if (!response.ok) {
-      throw new Error(`Groq Cloud API error: ${response.status} - ${responseText}`);
+      throw new Error(`Gemini API error: ${response.status} - ${responseText}`);
     }
 
-    const data = JSON.parse(responseText) as GroqResponse;
-    const textContent = data.choices?.[0]?.message?.content;
+    const data = JSON.parse(responseText) as GeminiResponse;
+    const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
     if (!textContent) {
-      throw new Error("No JSON payload returned from Groq Cloud.");
+      throw new Error("No JSON payload returned from Gemini.");
     }
 
     responseJson = textContent.trim();
@@ -665,38 +617,13 @@ export const listCookingRecommendations = async ({
     return cachedRecommendations;
   }
 
-  if (TEST_MODE) {
-    const fallbackRecommendations = filterRecommendations(mockCookingRecommendations, { mealType, cuisine });
-    cacheRecommendations(params, fallbackRecommendations);
-    return fallbackRecommendations;
-  }
-
-  let generatedRecommendations: CookingRecommendation[];
-
-  try {
-    generatedRecommendations = filterRecommendations(
-      await generateAIRecommendations(params),
-      { mealType, cuisine },
-    );
-  } catch (error) {
-    console.warn("AI cooking recommendations unavailable, using built-in recipes:", error);
-    generatedRecommendations = filterRecommendations(mockCookingRecommendations, { mealType, cuisine });
-  }
+  const generatedRecommendations = filterRecommendations(
+    await generateAIRecommendations(params),
+    { mealType, cuisine },
+  );
 
   cacheRecommendations(params, generatedRecommendations);
   return generatedRecommendations;
 };
 
-export const getCookingRecommendationById = async (id: string) => {
-  const cachedRecommendation = getCachedRecommendationById(id);
-
-  if (cachedRecommendation) {
-    return cachedRecommendation;
-  }
-
-  if (TEST_MODE) {
-    return mockCookingRecommendations.find((recommendation) => recommendation.id === id) ?? null;
-  }
-
-  return null;
-};
+export const getCookingRecommendationById = async (id: string) => getCachedRecommendationById(id);

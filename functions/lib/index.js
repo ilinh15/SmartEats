@@ -96,16 +96,24 @@ export const generateRecipe = functions.https.onRequest((req, res) => {
 Create a ${cuisine} recipe using these ingredients: ${ingredients.join(", ")}
 
 Return ONLY the JSON object, no markdown, no code blocks, no explanations. Valid JSON only.`;
-            let recipeJson;
+            let recipeJson = "";
             const hasGeminiKey = !!process.env.VITE_GEMINI_API_KEY?.trim();
             const hasMistralKey = !!process.env.VITE_MISTRAL_API_KEY?.trim();
             if (hasGeminiKey) {
-                recipeJson = await callGeminiAPI(prompt);
+                try {
+                    recipeJson = await callGeminiAPI(prompt);
+                }
+                catch (error) {
+                    if (!hasMistralKey) {
+                        throw error;
+                    }
+                    console.warn("Gemini API failed in Firebase function, trying fallback provider:", error);
+                }
             }
-            else if (hasMistralKey) {
+            if (!recipeJson && hasMistralKey) {
                 recipeJson = await callMistralAPI(prompt);
             }
-            else {
+            if (!recipeJson) {
                 throw new Error("No AI provider configured");
             }
             // Extract JSON from response (in case there's extra text)

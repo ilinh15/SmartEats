@@ -12,8 +12,6 @@ interface ImportMetaEnv {
   readonly VITE_GOOGLE_MAPS_API_KEY?: string;
   readonly VITE_MISTRAL_API_KEY?: string;
   readonly VITE_MISTRAL_MODEL?: string;
-  readonly VITE_GROQ_API_KEY?: string;
-  readonly VITE_GROQ_MODEL?: string;
   readonly VITE_UNSPLASH_ACCESS_KEY?: string;
 }
 
