@@ -1,3 +1,4 @@
+import { buildRecipeGenerationPrompt } from "./src/lib/recipePrompt";
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
@@ -59,34 +60,6 @@ export default defineConfig(({ mode }) => {
             }
 
             return preferred.replace(/^models\//, "");
-          };
-
-          const createRecipePrompt = (ingredients: string[], cuisine: string) => {
-            const cuisineText = cuisine !== "All" ? `${cuisine} cuisine` : "any cuisine";
-            const ingredientsList = ingredients.join(", ");
-
-            return `You are a professional chef. Generate a delicious recipe using these ingredients: ${ingredientsList}.
-The recipe should be ${cuisineText}.
-
-Return ONLY a valid JSON object (no markdown, no extra text) with this exact structure:
-{
-  "title": "Recipe name",
-  "prepTime": "15 Min",
-  "cookTime": "25 Min",
-  "servings": "2",
-  "difficulty": "Easy",
-  "tag": "Vegetarian",
-  "ingredients": ["ingredient 1", "ingredient 2"],
-  "instructions": ["Step 1", "Step 2"]
-}
-
-Requirements:
-- Use the provided ingredients in the recipe
-- Make it realistic and tasty
-- Keep instructions to 5-6 steps
-- Prep time and cook time format should be "X Min"
-- Difficulty should be Easy, Medium, or Hard
-- Generate 1-2 additional ingredients (like oil, salt, pepper) as needed`;
           };
 
           const createRepairPrompt = (rawText: string) => `Convert the following into a single valid JSON object with keys:
@@ -190,7 +163,8 @@ ${rawText}`;
                 model: requestedMistralModel,
                 messages: [{ role: "user", content: textPrompt }],
                 temperature: 0.7,
-                max_tokens: 1000,
+                max_tokens: 8192,
+                response_format: { type: "json_object" },
               }),
             });
             const upstreamJson = await upstream.json().catch(() => null);
@@ -269,7 +243,9 @@ ${rawText}`;
                 return;
               }
 
-              const prompt = createRecipePrompt(ingredients, cuisine);
+              const prompt = buildRecipeGenerationPrompt(ingredients, cuisine, {
+                userPreferences: Array.isArray(parsed.userPreferences) ? parsed.userPreferences : [],
+              });
               const providerErrors: string[] = [];
               let result: { provider: "gemini" | "mistral"; recipe: unknown } | null = null;
 

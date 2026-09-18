@@ -5,6 +5,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import CookPage from "@/pages/CookPage";
 import { listCookingRecommendations } from "@/lib/cookingRecommendations";
 
+vi.mock("@/lib/mealTime", () => ({
+  getMealTimeContent: () => ({ mealPeriod: "dinner", mealLabel: "Dinner" }),
+}));
+
 const mockToast = vi.fn();
 const mockGenerateRecipeWithGemini = vi.fn();
 
@@ -53,6 +57,48 @@ describe("CookPage clear all", () => {
     mockGenerateRecipeWithGemini.mockReset();
     mockedListCookingRecommendations.mockReset();
     mockedListCookingRecommendations.mockResolvedValue([]);
+  });
+
+  const cuisineCases = [
+    ["All", ""],
+    ["Chinese", "chinese"],
+    ["Malay", "malay"],
+    ["Indian", "indian"],
+    ["Japanese", "japanese"],
+    ["Korean", "korean"],
+    ["Western", "western"],
+  ] as const;
+
+  it.each(cuisineCases)("generates a recipe for the %s cuisine option", async (label, cuisine) => {
+    mockGenerateRecipeWithGemini.mockResolvedValue({
+      title: `${label} Chicken Recipe`,
+      prepTime: "10 Min",
+      cookTime: "20 Min",
+      servings: "2",
+      difficulty: "Easy",
+      tag: label,
+      ingredients: ["Chicken", "Rice"],
+      instructions: ["Cook the chicken.", "Serve with rice."],
+    });
+    renderCookPage();
+    fireEvent.click(screen.getByRole("button", { name: "Chicken" }));
+    fireEvent.click(screen.getAllByRole("button", { name: label, exact: true })[0]);
+    fireEvent.click(screen.getByRole("button", { name: /let's cook/i }));
+    expect(await screen.findByRole("heading", { name: `${label} Chicken Recipe` })).toBeInTheDocument();
+    expect(mockGenerateRecipeWithGemini).toHaveBeenCalledWith(["Chicken"], cuisine, { userPreferences: [] });
+  });
+
+  it.each(cuisineCases)("loads recommendations for the %s cuisine option", async (label, cuisine) => {
+    renderCookPage();
+    fireEvent.click(screen.getAllByRole("button", { name: label, exact: true })[1]);
+    await waitFor(() => {
+      expect(mockedListCookingRecommendations).toHaveBeenLastCalledWith({
+        mealType: "dinner",
+        cuisine: cuisine || undefined,
+      });
+    });
+    expect(await screen.findByText(cuisine ? "No recipes found for this cuisine." : "No recipes found right now."))
+      .toBeInTheDocument();
   });
 
   it("clears selected ingredients and typed input", async () => {
@@ -151,6 +197,7 @@ describe("CookPage clear all", () => {
     await waitFor(() => {
       expect(mockedListCookingRecommendations).toHaveBeenLastCalledWith({
         cuisine: "korean",
+        mealType: "dinner",
       });
     });
   });

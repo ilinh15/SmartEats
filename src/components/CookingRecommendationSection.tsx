@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useCookingRecommendations } from "@/hooks/useCookingRecommendations";
 import { useNavigate } from "react-router-dom";
 import CookingRecommendationCard from "@/components/CookingRecommendationCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   COOKING_MEAL_LABELS,
   cookingCuisineFilters,
-  listCookingRecommendations,
   type CookingCuisineFilter,
   type CookingMealType,
   type CookingRecommendation,
@@ -36,19 +35,7 @@ const CookingRecommendationSection = ({
   const navigate = useNavigate();
   const mealLabel = COOKING_MEAL_LABELS[mealType];
 
-  const recommendationsQuery = useQuery({
-    queryKey: ["home-cooking-recommendations", mealType, selectedCuisine, userPreferences.join("|")],
-    staleTime: 5 * 60 * 1000,
-    queryFn: () => {
-      const params = {
-        mealType,
-        cuisine: selectedCuisine === "all" ? undefined : selectedCuisine,
-        ...(userPreferences.length > 0 ? { userPreferences } : {}),
-      };
-
-      return listCookingRecommendations(params);
-    },
-  });
+  const recommendationsQuery = useCookingRecommendations(mealType, selectedCuisine, userPreferences);
 
   const recommendations = recommendationsQuery.data ?? [];
   const isFiltered = selectedCuisine !== "all";

@@ -1,0 +1,80 @@
+{
+  "runAt": "2026-09-18T13:57:13.437Z",
+  "methodology": "One request per provider per cuisine; identical current four-recipe vegan dinner prompt; temperature 0.8; JSON mode; output cap 8192; 45-second timeout; alternating provider order; no image fetching or cache. Preference compliance requires manual review.",
+  "results": [
+    {
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "cuisine": "chinese",
+      "seconds": 0.52,
+      "status": 429
+    },
+    {
+      "provider": "mistral",
+      "model": "mistral-small-latest",
+      "cuisine": "chinese",
+      "seconds": 0.65,
+      "status": 429
+    },
+    {
+      "provider": "mistral",
+      "model": "mistral-small-latest",
+      "cuisine": "malay",
+      "skipped": "HTTP 429 on initial request"
+    },
+    {
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "cuisine": "malay",
+      "skipped": "HTTP 429 on initial request"
+    },
+    {
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "cuisine": "indian",
+      "skipped": "HTTP 429 on initial request"
+    },
+    {
+      "provider": "mistral",
+      "model": "mistral-small-latest",
+      "cuisine": "indian",
+      "skipped": "HTTP 429 on initial request"
+    },
+    {
+      "provider": "mistral",
+      "model": "mistral-small-latest",
+      "cuisine": "japanese",
+      "skipped": "HTTP 429 on initial request"
+    },
+    {
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "cuisine": "japanese",
+      "skipped": "HTTP 429 on initial request"
+    },
+    {
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "cuisine": "korean",
+      "skipped": "HTTP 429 on initial request"
+    },
+    {
+      "provider": "mistral",
+      "model": "mistral-small-latest",
+      "cuisine": "korean",
+      "skipped": "HTTP 429 on initial request"
+    },
+    {
+      "provider": "mistral",
+      "model": "mistral-small-latest",
+      "cuisine": "western",
+      "skipped": "HTTP 429 on initial request"
+    },
+    {
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "cuisine": "western",
+      "skipped": "HTTP 429 on initial request"
+    }
+  ]
+}

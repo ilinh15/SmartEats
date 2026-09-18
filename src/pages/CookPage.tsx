@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertCircle, ChefHat, Clock, Heart, Users, X } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useCookingRecommendations } from "@/hooks/useCookingRecommendations";
+import { getMealTimeContent } from "@/lib/mealTime";
 import { useNavigate } from "react-router-dom";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { generateRecipeWithGemini, type GeneratedRecipe } from "@/lib/recipeGeneration";
 import { createSavedRecipeFromGeneratedRecipe, type FavoriteRecipeInput } from "@/lib/recipeFavorites";
 import {
-  listCookingRecommendations,
   type CookingCuisineFilter,
   cookingCuisineFilters,
 } from "@/lib/cookingRecommendations";
@@ -47,6 +47,13 @@ const CookPage = ({
 }: CookPageProps) => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+  const mealContent = useMemo(() => getMealTimeContent(currentTime), [currentTime]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setCurrentTime(new Date()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
   const [selected, setSelected] = useState<string[]>([]);
   const [ingredientInput, setIngredientInput] = useState("");
   const [showResult, setShowResult] = useState(false);
@@ -87,18 +94,11 @@ const CookPage = ({
     return unsubscribe;
   }, []);
 
-  const cookingRecommendationsQuery = useQuery({
-    queryKey: ["cook-page-recommendations", recommendationCuisine, userPreferences.join("|")],
-    queryFn: () => {
-      const params = {
-        cuisine: recommendationCuisine === "all" ? undefined : recommendationCuisine,
-        ...(userPreferences.length > 0 ? { userPreferences } : {}),
-      };
-
-      return listCookingRecommendations(params);
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
+  const cookingRecommendationsQuery = useCookingRecommendations(
+    mealContent.mealPeriod,
+    recommendationCuisine,
+    userPreferences,
+  );
 
   const hasCookSessionState = selected.length > 0 || ingredientInput.trim().length > 0 || !!generatedRecipe || !!error;
   const generatedFavoriteRecipe = useMemo(
@@ -402,7 +402,7 @@ const CookPage = ({
           <div>
             <h2 className="text-xl font-display font-semibold text-foreground">Recipes to cook</h2>
             <p className="mt-1 text-sm font-body text-muted-foreground">
-              Explore AI-generated recipe ideas matched to your selected cuisine.
+              Explore AI-generated {mealContent.mealLabel.toLowerCase()} recipes matched to your selected cuisine and saved preferences.
             </p>
           </div>
 

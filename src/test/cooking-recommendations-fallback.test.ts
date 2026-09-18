@@ -61,6 +61,25 @@ describe("cooking recommendation provider fallback", () => {
     await expect(listCookingRecommendations()).rejects.toThrow("No AI provider configured");
   });
 
+  it.each([
+    "not JSON",
+    '{"recommendations":[]}',
+    '{"recommendations":[null]}',
+    '{"recommendations":[{"title":"Wrong cuisine","cuisine":"western","mealType":"dinner","ingredients":["Rice"],"instructions":["Cook rice."]}]}',
+  ])("tries Gemini when Mistral returns unusable recipes: %s", async (content) => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content } }] })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ recommendations: [{
+        title: "Ginger Rice", cuisine: "chinese", mealType: "dinner",
+        ingredients: ["Rice", "Ginger"], instructions: ["Cook rice with ginger."],
+      }] }) }] } }] })));
+    vi.stubGlobal("fetch", fetchMock);
+    const { listCookingRecommendations } = await import("@/lib/cookingRecommendations");
+    const recipes = await listCookingRecommendations({ cuisine: "chinese", mealType: "dinner" });
+    expect(recipes.map((recipe) => recipe.title)).toEqual(["Ginger Rice"]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("gives Gemini enough output capacity for the full recommendation payload", async () => {
     const fetchMock = vi
       .fn()

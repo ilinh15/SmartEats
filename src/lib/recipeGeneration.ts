@@ -1,8 +1,6 @@
-import {
-  buildPreferenceInstructions,
-  getPreferenceTagLabels,
-  normalizeUserPreferences,
-} from "@/lib/preferenceInstructions";
+import { normalizeUserPreferences } from "@/lib/preferenceInstructions";
+import { buildRecipeGenerationPrompt, type GenerateRecipeOptions } from "./recipePrompt";
+export { buildRecipeGenerationPrompt, type GenerateRecipeOptions } from "./recipePrompt";
 
 export interface GeneratedRecipe {
   title: string;
@@ -14,10 +12,6 @@ export interface GeneratedRecipe {
   ingredients: string[];
   instructions: string[];
   imageUrl?: string;
-}
-
-export interface GenerateRecipeOptions {
-  userPreferences?: string[];
 }
 
 interface GeminiResponse {
@@ -37,41 +31,6 @@ interface MistralResponse {
     };
   }>;
 }
-
-export const buildRecipeGenerationPrompt = (
-  ingredients: string[],
-  cuisine: string,
-  options: GenerateRecipeOptions = {},
-) => {
-  const preferenceInstructions = buildPreferenceInstructions(options.userPreferences);
-  const preferenceTagLabels = getPreferenceTagLabels(options.userPreferences);
-  const preferenceInstruction =
-    preferenceInstructions.length > 0
-      ? [
-          "Selected preference rules are strict and must all be satisfied together:",
-          ...preferenceInstructions.map((instruction) => `- ${instruction}`),
-          `Use a tag that reflects the matching preference when relevant, especially: ${preferenceTagLabels.join(", ")}.`,
-        ].join("\n")
-      : "No user dietary or budget preferences were provided.";
-  const cuisineInstruction = cuisine.trim().length > 0 ? `${cuisine} recipe` : "recipe";
-
-  return `Generate a JSON recipe object with the following structure:
-{
-  "title": "string (recipe name)",
-  "prepTime": "string (e.g., '15 minutes')",
-  "cookTime": "string (e.g., '30 minutes')",
-  "servings": "string (e.g., '4 servings')",
-  "difficulty": "Easy|Medium|Hard",
-  "tag": "string (cuisine type or matching preference tag)",
-  "ingredients": ["string", "string", ...],
-  "instructions": ["string", "string", ...]
-}
-
-Create a ${cuisineInstruction} using these ingredients: ${ingredients.join(", ")}
-${preferenceInstruction}
-
-Return ONLY the JSON object, no markdown, no code blocks, no explanations. Valid JSON only.`;
-};
 
 /**
  * Fetch a recipe image from Unsplash API
@@ -188,6 +147,8 @@ export async function generateRecipeWithGemini(
               },
             ],
             temperature: 0.7,
+            max_tokens: 8192,
+            response_format: { type: "json_object" },
           }),
         });
 

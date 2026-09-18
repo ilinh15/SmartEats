@@ -81,7 +81,7 @@ interface MistralResponse {
 
 const AI_RECOMMENDATION_CACHE_KEY = "smarteats.ai-cooking-recommendations.v3";
 const AI_RECOMMENDATION_CACHE_TTL_MS = 30 * 60 * 1000;
-const AI_RECOMMENDATION_COUNT = 6;
+const AI_RECOMMENDATION_COUNT = 4;
 
 const cookingCuisines: CookingCuisine[] = ["chinese", "malay", "indian", "japanese", "korean", "western"];
 const cookingMealTypes: CookingMealType[] = ["breakfast", "lunch", "dinner", "supper"];
@@ -406,12 +406,12 @@ const extractJsonPayload = (responseText: string) => {
   return parsed;
 };
 
-const requestRecommendationJson = async (prompt: string) => {
+const requestRecommendations = async (prompt: string, params: GetCookingRecommendationsParams) => {
   if (!hasGeminiKey() && !hasMistralKey()) {
     throw new Error("No AI provider configured. Add VITE_GEMINI_API_KEY or VITE_MISTRAL_API_KEY to enable AI cooking recommendations.");
   }
 
-  let responseJson = "";
+  let recommendations: CookingRecommendation[] | undefined;
 
   if (hasMistralKey()) {
     const mistralKey = import.meta.env.VITE_MISTRAL_API_KEY;
@@ -433,6 +433,7 @@ const requestRecommendationJson = async (prompt: string) => {
             },
           ],
           temperature: 0.8,
+          max_tokens: 8192,
           response_format: {
             type: "json_object",
           },
@@ -452,7 +453,7 @@ const requestRecommendationJson = async (prompt: string) => {
         throw new Error("No JSON payload returned from Mistral.");
       }
 
-      responseJson = textContent.trim();
+      recommendations = parseRecommendationResponse(textContent, params);
     } catch (error) {
       if (!hasGeminiKey()) {
         throw error;
@@ -462,7 +463,7 @@ const requestRecommendationJson = async (prompt: string) => {
     }
   }
 
-  if (!responseJson && hasGeminiKey()) {
+  if (!recommendations && hasGeminiKey()) {
     const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
     const geminiModel = String(import.meta.env.VITE_GEMINI_MODEL || "gemini-3.6-flash").toLowerCase().trim();
     const response = await fetch(
@@ -505,14 +506,14 @@ const requestRecommendationJson = async (prompt: string) => {
       throw new Error("No JSON payload returned from Gemini.");
     }
 
-    responseJson = textContent.trim();
+    recommendations = parseRecommendationResponse(textContent, params);
   }
 
-  if (!responseJson) {
+  if (!recommendations) {
     throw new Error("AI recommendation generation returned an empty response.");
   }
 
-  return responseJson;
+  return recommendations;
 };
 
 const defaultDescription = (cuisine: CookingCuisine, mealType: CookingMealType) =>
@@ -583,12 +584,15 @@ const hydrateRecommendationImages = async (recommendations: CookingRecommendatio
   return hydratedRecommendations;
 };
 
-const generateAIRecommendations = async (params: GetCookingRecommendationsParams) => {
-  const prompt = buildCookingRecommendationPrompt(params);
-  const responseJson = await requestRecommendationJson(prompt);
+const parseRecommendationResponse = (responseJson: string, params: GetCookingRecommendationsParams) => {
   const payload = extractJsonPayload(responseJson);
 
-  const recommendations = (payload.recommendations ?? [])
+  if (!Array.isArray(payload?.recommendations)) {
+    throw new Error("AI returned an invalid recommendation payload.");
+  }
+
+  const recommendations = payload.recommendations
+    .filter((candidate) => candidate && typeof candidate === "object")
     .map((candidate, index) => normalizeGeneratedRecommendation(candidate, index, params))
     .filter((recommendation): recommendation is CookingRecommendation => recommendation !== null)
     .filter((recommendation, index, allRecommendations) => {
@@ -596,10 +600,16 @@ const generateAIRecommendations = async (params: GetCookingRecommendationsParams
     })
     .slice(0, AI_RECOMMENDATION_COUNT);
 
-  if (recommendations.length === 0) {
+  const matchingRecommendations = filterRecommendations(recommendations, params);
+  if (matchingRecommendations.length === 0) {
     throw new Error("AI returned no usable cooking recommendations.");
   }
 
+  return matchingRecommendations;
+};
+
+const generateAIRecommendations = async (params: GetCookingRecommendationsParams) => {
+  const recommendations = await requestRecommendations(buildCookingRecommendationPrompt(params), params);
   return hydrateRecommendationImages(recommendations);
 };
 
@@ -614,7 +624,7 @@ export const listCookingRecommendations = async ({
   const cachedRecommendations = getCachedRecommendations(params);
 
   if (cachedRecommendations) {
-    return cachedRecommendations;
+    return cachedRecommendations.slice(0, AI_RECOMMENDATION_COUNT);
   }
 
   const generatedRecommendations = filterRecommendations(
